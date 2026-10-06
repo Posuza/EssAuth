@@ -6,7 +6,7 @@ let client: EssAuthClient | null = null;
 
 function configuredClient(): EssAuthClient {
   if (!client) {
-    throw new EssAuthError("Call start() before using the default EssAuthO1 client.", {
+    throw new EssAuthError("Call start() before using the default EssAuth client.", {
       code: "SDK_NOT_STARTED",
     });
   }

@@ -1,4 +1,4 @@
-# EssAuth1.0 SDK
+# EssAuth SDK
 
 Standalone browser SDK for the current ESS backend. It covers employee login,
 session persistence, identity-aware API requests, and face profile operations.
@@ -9,13 +9,13 @@ It does not modify or depend on the existing frontend application.
 Install the latest code directly from GitHub:
 
 ```bash
-npm install github:Posuza/EssAuth1.0
+npm install github:Posuza/EssAuth
 ```
 
 For a reproducible installation, use a tagged release:
 
 ```bash
-npm install github:Posuza/EssAuth1.0#v0.1.0
+npm install github:Posuza/EssAuth#v0.1.0
 ```
 
 The package has no runtime dependencies. The repository includes the compiled
@@ -62,7 +62,7 @@ Pass `storage: null` to keep the session in memory instead of session storage.
 ## Current authentication boundary
 
 The current backend login response contains an employee profile, but no access
-token, refresh token, cookie, or session-verification endpoint. EssAuthO1 stores
+token, refresh token, cookie, or session-verification endpoint. EssAuth stores
 that profile in `sessionStorage` and uses the server's existing employee-code
 identity header for protected requests. This preserves the current behavior but
 is not a cryptographically verifiable session.

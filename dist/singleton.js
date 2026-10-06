@@ -3,7 +3,7 @@ import { EssAuthError } from "./errors.js";
 let client = null;
 function configuredClient() {
     if (!client) {
-        throw new EssAuthError("Call start() before using the default EssAuthO1 client.", {
+        throw new EssAuthError("Call start() before using the default EssAuth client.", {
             code: "SDK_NOT_STARTED",
         });
     }

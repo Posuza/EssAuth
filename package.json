@@ -4,11 +4,11 @@
   "description": "Browser SDK for ESS authentication and face verification APIs",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Posuza/EssAuth1.0.git"
+    "url": "git+https://github.com/Posuza/EssAuth.git"
   },
-  "homepage": "https://github.com/Posuza/EssAuth1.0#readme",
+  "homepage": "https://github.com/Posuza/EssAuth#readme",
   "bugs": {
-    "url": "https://github.com/Posuza/EssAuth1.0/issues"
+    "url": "https://github.com/Posuza/EssAuth/issues"
   },
   "type": "module",
   "main": "./dist/index.js",
