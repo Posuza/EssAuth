@@ -18,20 +18,13 @@ export interface EssAuthInitOptions {
  * verification, callback cleanup, and identity persistence stay inside the SDK.
  */
 export declare class EssAuth {
+    #private;
     employeeId: string | null;
     error: Error | null;
-    private readonly publicKey;
-    private readonly loginUrl;
-    private readonly storage;
-    private readonly storageKey;
-    private readonly client;
     private constructor();
     static init(options: EssAuthInitOptions): Promise<EssAuth>;
     login(): void;
     logout(): Promise<void>;
-    private initialize;
-    private restoreIdentity;
-    private clearIdentity;
 }
 export default EssAuth;
 //# sourceMappingURL=browser-auth.d.ts.map

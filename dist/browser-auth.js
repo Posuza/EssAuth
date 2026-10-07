@@ -30,56 +30,56 @@ function browserUrl() {
 export class EssAuth {
     employeeId = null;
     error = null;
-    publicKey;
-    loginUrl;
-    storage;
-    storageKey;
-    client;
+    #publicKey;
+    #loginUrl;
+    #storage;
+    #storageKey;
+    #client;
     constructor(options) {
-        this.publicKey = requiredPublicKey(options.publicKey);
-        this.loginUrl = options.loginUrl?.trim() || DEFAULT_LOGIN_URL;
-        this.storage = options.storage ?? defaultStorage();
-        this.storageKey = options.storageKey?.trim() || `${DEFAULT_STORAGE_KEY}.${this.publicKey}`;
-        this.client = new EssAuthClient({
+        this.#publicKey = requiredPublicKey(options.publicKey);
+        this.#loginUrl = options.loginUrl?.trim() || DEFAULT_LOGIN_URL;
+        this.#storage = options.storage ?? defaultStorage();
+        this.#storageKey = options.storageKey?.trim() || `${DEFAULT_STORAGE_KEY}.${this.#publicKey}`;
+        this.#client = new EssAuthClient({
             baseUrl: options.apiUrl?.trim() || DEFAULT_API_URL,
-            publicKey: this.publicKey,
+            publicKey: this.#publicKey,
             storage: null,
             ...(options.fetch ? { fetch: options.fetch } : {}),
         });
     }
     static async init(options) {
         const auth = new EssAuth(options);
-        await auth.initialize();
+        await auth.#initialize();
         return auth;
     }
     login() {
-        this.clearIdentity();
+        this.#clearIdentity();
         const callback = browserUrl();
         callback.searchParams.delete("ticket");
-        const login = new URL(this.loginUrl);
-        login.searchParams.set("public_key", this.publicKey);
+        const login = new URL(this.#loginUrl);
+        login.searchParams.set("public_key", this.#publicKey);
         login.searchParams.set("return_to", callback.toString());
         globalThis.location.assign(login.toString());
     }
     async logout() {
         const employeeId = this.employeeId;
-        this.clearIdentity();
+        this.#clearIdentity();
         if (!employeeId)
             return;
-        await this.client.notifyClientLogout(employeeId);
+        await this.#client.notifyClientLogout(employeeId);
     }
-    async initialize() {
+    async #initialize() {
         const url = browserUrl();
         const ticket = url.searchParams.get("ticket");
         if (!ticket) {
-            this.restoreIdentity();
+            this.#restoreIdentity();
             return;
         }
-        this.clearIdentity();
+        this.#clearIdentity();
         try {
-            const result = await this.client.verifyTicket(ticket);
+            const result = await this.#client.verifyTicket(ticket);
             this.employeeId = result.employee_id;
-            this.storage.setItem(this.storageKey, JSON.stringify({ employeeId: result.employee_id, publicKey: this.publicKey }));
+            this.#storage.setItem(this.#storageKey, JSON.stringify({ employeeId: result.employee_id, publicKey: this.#publicKey }));
         }
         catch (error) {
             this.error = error instanceof Error ? error : new Error("ESS login failed.");
@@ -89,13 +89,13 @@ export class EssAuth {
             globalThis.history.replaceState(globalThis.history.state, "", url.toString());
         }
     }
-    restoreIdentity() {
-        const stored = this.storage.getItem(this.storageKey);
+    #restoreIdentity() {
+        const stored = this.#storage.getItem(this.#storageKey);
         if (!stored)
             return;
         try {
             const identity = JSON.parse(stored);
-            if (identity.publicKey !== this.publicKey
+            if (identity.publicKey !== this.#publicKey
                 || typeof identity.employeeId !== "string"
                 || !identity.employeeId.trim()) {
                 throw new Error("Invalid stored identity");
@@ -103,13 +103,13 @@ export class EssAuth {
             this.employeeId = identity.employeeId;
         }
         catch {
-            this.storage.removeItem(this.storageKey);
+            this.#storage.removeItem(this.#storageKey);
         }
     }
-    clearIdentity() {
+    #clearIdentity() {
         this.employeeId = null;
         this.error = null;
-        this.storage.removeItem(this.storageKey);
+        this.#storage.removeItem(this.#storageKey);
     }
 }
 export default EssAuth;

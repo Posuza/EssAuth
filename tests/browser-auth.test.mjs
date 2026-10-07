@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import EssAuth from "../dist/index.js";
+import EssAuth, * as PublicSdk from "../dist/index.js";
 
 function memoryStorage() {
   const values = new Map();
@@ -12,6 +12,15 @@ function memoryStorage() {
     removeItem: (key) => values.delete(key),
   };
 }
+
+test("public entry exposes only the three-method browser API", () => {
+  assert.deepEqual(Object.keys(PublicSdk), ["default"]);
+  assert.equal(typeof EssAuth.init, "function");
+  assert.deepEqual(
+    Object.getOwnPropertyNames(EssAuth.prototype),
+    ["constructor", "login", "logout"],
+  );
+});
 
 test("redirect login verifies, restores, and logs out the client identity", async (context) => {
   const originalLocation = Object.getOwnPropertyDescriptor(globalThis, "location");

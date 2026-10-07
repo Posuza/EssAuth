@@ -1,7 +1,8 @@
 # EssAuth SDK
 
-Browser SDK for redirect-based ESS authentication. Client applications use
-three methods only: `init`, `login`, and `logout`. The SDK handles the ESS
+Browser SDK for redirect-based ESS authentication. Its public entry exports
+only the default `EssAuth` API. Client applications use three methods only:
+`init`, `login`, and `logout`. The SDK handles the ESS
 redirect, ticket verification, callback URL cleanup, and session persistence.
 
 ## Install
