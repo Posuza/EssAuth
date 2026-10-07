@@ -1,0 +1,1 @@
+{"version":3,"file":"lifecycle.d.ts","sourceRoot":"","sources":["../../src/internal/lifecycle.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,eAAe,EAAE,MAAM,uBAAuB,CAAC;AAExD,OAAO,EAAE,aAAa,EAAE,MAAM,aAAa,CAAC;AAC5C,OAAO,KAAK,EAAE,kBAAkB,EAAE,MAAM,oBAAoB,CAAC;AAE7D,wBAAsB,kBAAkB,CACtC,QAAQ,EAAE,eAAe,EACzB,OAAO,EAAE,aAAa,GACrB,OAAO,CAAC,kBAAkB,CAAC,CAqB7B"}

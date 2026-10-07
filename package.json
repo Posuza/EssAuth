@@ -1,7 +1,7 @@
 {
   "name": "@ess/auth-o1",
   "version": "0.1.0",
-  "description": "Browser SDK for ESS authentication and face verification APIs",
+  "description": "Browser SDK for redirect-based ESS authentication",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Posuza/EssAuth.git"
@@ -21,11 +21,12 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "ARCHITECTURE.md"
   ],
   "sideEffects": false,
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "publish:cdn": "npm run build && node scripts/publish-cdn.mjs",
     "test": "npm run build && node --test",

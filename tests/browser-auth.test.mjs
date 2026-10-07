@@ -22,6 +22,14 @@ test("public entry exposes only the three-method browser API", () => {
   );
 });
 
+test("initialization rejects a client key that is not exactly 16 characters", async () => {
+  await assert.rejects(
+    EssAuth.init({ publicKey: "essmo1234" }),
+    (error) => error instanceof Error
+      && error.code === "INVALID_CLIENT_PUBLIC_KEY",
+  );
+});
+
 test("redirect login verifies, restores, and logs out the client identity", async (context) => {
   const originalLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
   const originalHistory = Object.getOwnPropertyDescriptor(globalThis, "history");
@@ -71,7 +79,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
     });
   };
   const options = {
-    publicKey: "registered-public-key",
+    publicKey: "Ab3dE6gH9jKm2NpQ",
     apiUrl: "https://api.example.test/api/v1",
     loginUrl: "https://ess.example.test/client-auth/login",
     storage,
@@ -85,7 +93,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
   assert.deepEqual(requests, [{
     url: "https://api.example.test/api/v1/client-auth/tickets/verify",
     body: {
-      public_key: "registered-public-key",
+      public_key: "Ab3dE6gH9jKm2NpQ",
       ticket: "opaque-ticket",
     },
     keepalive: false,
@@ -102,7 +110,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
   assert.deepEqual(requests[1], {
     url: "https://api.example.test/api/v1/client-auth/logout",
     body: {
-      public_key: "registered-public-key",
+      public_key: "Ab3dE6gH9jKm2NpQ",
       employee_id: "680708",
     },
     keepalive: true,
@@ -115,7 +123,46 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
   loggedOut.login();
   const redirect = new URL(assignedUrl);
   assert.equal(redirect.href.startsWith("https://ess.example.test/client-auth/login?"), true);
-  assert.equal(redirect.searchParams.get("public_key"), "registered-public-key");
+  assert.equal(redirect.searchParams.get("public_key"), "Ab3dE6gH9jKm2NpQ");
   assert.equal(redirect.searchParams.get("return_to"), currentHref);
   assert.equal(loggedOut.employeeId, null);
+});
+
+test("logout clears restored identity when the notification request fails", async (context) => {
+  const originalLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
+  const originalHistory = Object.getOwnPropertyDescriptor(globalThis, "history");
+  context.after(() => {
+    if (originalLocation) Object.defineProperty(globalThis, "location", originalLocation);
+    else delete globalThis.location;
+    if (originalHistory) Object.defineProperty(globalThis, "history", originalHistory);
+    else delete globalThis.history;
+  });
+
+  Object.defineProperty(globalThis, "location", {
+    configurable: true,
+    value: { href: "https://client.example.test/payroll" },
+  });
+  Object.defineProperty(globalThis, "history", {
+    configurable: true,
+    value: { state: null, replaceState() {} },
+  });
+
+  const publicKey = "Ab3dE6gH9jKm2NpQ";
+  const storage = memoryStorage();
+  storage.setItem(
+    `ess-auth-o1.client-identity.v1.${publicKey}`,
+    JSON.stringify({ employeeId: "680708", publicKey }),
+  );
+  const auth = await EssAuth.init({
+    publicKey,
+    storage,
+    fetch: async () => {
+      throw new TypeError("offline");
+    },
+  });
+
+  assert.equal(auth.employeeId, "680708");
+  await assert.rejects(auth.logout(), (error) => error?.code === "NETWORK_ERROR");
+  assert.equal(auth.employeeId, null);
+  assert.equal(storage.values.size, 0);
 });

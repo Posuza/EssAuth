@@ -1,3 +1,3 @@
-export { EssAuth as default } from "./browser-auth.js";
-export type { EssAuthInitOptions } from "./browser-auth.js";
+export { EssAuth as default } from "./public/ess-auth.js";
+export type { EssAuthInitOptions } from "./public/types.js";
 //# sourceMappingURL=index.d.ts.map

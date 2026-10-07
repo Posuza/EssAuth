@@ -1,2 +1,2 @@
-export { EssAuth as default } from "./browser-auth.js";
+export { EssAuth as default } from "./public/ess-auth.js";
 //# sourceMappingURL=index.js.map

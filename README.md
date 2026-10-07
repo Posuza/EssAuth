@@ -5,6 +5,9 @@ only the default `EssAuth` API. Client applications use three methods only:
 `init`, `login`, and `logout`. The SDK handles the ESS
 redirect, ticket verification, callback URL cleanup, and session persistence.
 
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for module ownership, dependency
+rules, and the extension points for future telemetry and heartbeat support.
+
 ## Install
 
 Install a tagged release from GitHub:
@@ -39,7 +42,7 @@ breaking API version.
 import EssAuth from "@ess/auth-o1";
 
 const auth = await EssAuth.init({
-  publicKey: "your-registered-public-key",
+  publicKey: "Ab3dE6gH9jKm2NpQ",
 });
 
 if (auth.error) {
@@ -169,7 +172,7 @@ Self-hosted and local environments can override either endpoint:
 
 ```js
 const auth = await EssAuth.init({
-  publicKey: "your-registered-public-key",
+  publicKey: "Ab3dE6gH9jKm2NpQ",
   apiUrl: "https://custom-ess.example.com/api/v1",
   loginUrl: "https://custom-ess.example.com/client-auth/login",
 });
