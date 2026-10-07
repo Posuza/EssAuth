@@ -67,18 +67,18 @@ Clears the employee ID and the SDK's local session for the current client.
 
 ## Local testing
 
-The test build defaults to:
+The test build connects through the local ESS Caddy reverse proxy:
 
-- API: `http://127.0.0.1:8000/api/v1`
-- Login: `http://127.0.0.1:5173/client-auth/login`
+- API: `https://essauth.localhost/api/v1`
+- Login: `https://essauth.localhost/client-auth/login`
 
 Self-hosted and local environments can override either endpoint:
 
 ```js
 const auth = await EssAuth.init({
   publicKey: "your-registered-public-key",
-  apiUrl: "http://127.0.0.1:8000/api/v1",
-  loginUrl: "http://127.0.0.1:5173/client-auth/login",
+  apiUrl: "https://custom-ess.example.com/api/v1",
+  loginUrl: "https://custom-ess.example.com/client-auth/login",
 });
 ```
 

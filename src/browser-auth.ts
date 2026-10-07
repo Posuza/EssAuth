@@ -3,8 +3,8 @@ import { EssAuthError } from "./errors.js";
 import { defaultStorage } from "./storage.js";
 import type { StorageLike } from "./types.js";
 
-const DEFAULT_API_URL = "http://127.0.0.1:8000/api/v1";
-const DEFAULT_LOGIN_URL = "http://127.0.0.1:5173/client-auth/login";
+const DEFAULT_API_URL = "https://essauth.localhost/api/v1";
+const DEFAULT_LOGIN_URL = "https://essauth.localhost/client-auth/login";
 const DEFAULT_STORAGE_KEY = "ess-auth-o1.client-identity.v1";
 
 type StoredIdentity = {
