@@ -172,6 +172,23 @@ export class EssAuthClient {
             body: JSON.stringify({ public_key: this.publicKey, ticket: normalizedTicket }),
         }, false, "Ticket verification failed.");
     }
+    async notifyClientLogout(employeeId) {
+        if (!this.publicKey) {
+            throw new EssAuthError("A registered client public key is required.", {
+                code: "CLIENT_PUBLIC_KEY_REQUIRED",
+            });
+        }
+        const employeeCode = normalizeEmployeeCode(employeeId);
+        return this.json("/client-auth/logout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                public_key: this.publicKey,
+                employee_id: employeeCode,
+            }),
+            keepalive: true,
+        }, false, "Logout notification failed.");
+    }
     setSession(session) {
         this.session = session;
         if (session)

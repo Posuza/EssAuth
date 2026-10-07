@@ -61,8 +61,12 @@ export class EssAuth {
         login.searchParams.set("return_to", callback.toString());
         globalThis.location.assign(login.toString());
     }
-    logout() {
+    async logout() {
+        const employeeId = this.employeeId;
         this.clearIdentity();
+        if (!employeeId)
+            return;
+        await this.client.notifyClientLogout(employeeId);
     }
     async initialize() {
         const url = browserUrl();

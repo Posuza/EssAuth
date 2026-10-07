@@ -6,6 +6,7 @@ export { getClient, getSession, getUser, login, logout, start, verifyTicket } fr
 export type { EssAuthInitOptions } from "./browser-auth.js";
 export type {
   AuthStateListener,
+  ClientLogoutNotificationResult,
   ClientTicketVerificationResult,
   EmployeeProfile,
   EssAuthClientOptions,

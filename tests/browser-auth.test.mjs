@@ -52,8 +52,11 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
   });
 
   const fetch = async (url, init) => {
-    requests.push({ url, body: JSON.parse(init.body) });
-    return new Response(JSON.stringify({ employee_id: "680708" }), {
+    requests.push({ url, body: JSON.parse(init.body), keepalive: init.keepalive ?? false });
+    const response = url.endsWith("/client-auth/logout")
+      ? { message: "Logout notification recorded." }
+      : { employee_id: "680708" };
+    return new Response(JSON.stringify(response), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
@@ -76,6 +79,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
       public_key: "registered-public-key",
       ticket: "opaque-ticket",
     },
+    keepalive: false,
   }]);
   assert.equal(new URL(cleanedUrl).searchParams.has("ticket"), false);
 
@@ -83,14 +87,26 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
   assert.equal(restored.employeeId, "680708");
   assert.equal(requests.length, 1);
 
-  restored.login();
+  await restored.logout();
+  assert.equal(restored.employeeId, null);
+  assert.equal(storage.values.size, 0);
+  assert.deepEqual(requests[1], {
+    url: "https://api.example.test/api/v1/client-auth/logout",
+    body: {
+      public_key: "registered-public-key",
+      employee_id: "680708",
+    },
+    keepalive: true,
+  });
+
+  const loggedOut = await EssAuth.init(options);
+  assert.equal(loggedOut.employeeId, null);
+  assert.equal(requests.length, 2);
+
+  loggedOut.login();
   const redirect = new URL(assignedUrl);
   assert.equal(redirect.href.startsWith("https://ess.example.test/client-auth/login?"), true);
   assert.equal(redirect.searchParams.get("public_key"), "registered-public-key");
   assert.equal(redirect.searchParams.get("return_to"), currentHref);
-  assert.equal(restored.employeeId, null);
-
-  restored.logout();
-  assert.equal(restored.employeeId, null);
-  assert.equal(storage.values.size, 0);
+  assert.equal(loggedOut.employeeId, null);
 });

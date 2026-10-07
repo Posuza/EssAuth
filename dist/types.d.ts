@@ -61,6 +61,9 @@ export interface FaceEnrollResult {
 export interface ClientTicketVerificationResult {
     employee_id: string;
 }
+export interface ClientLogoutNotificationResult {
+    message: string;
+}
 export type AuthStateListener = (session: EssAuthSession | null) => void;
 export interface EssAuthClientOptions {
     /** API root including the version prefix. Defaults to `http://localhost:8000/api/v1`. */

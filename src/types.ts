@@ -72,6 +72,10 @@ export interface ClientTicketVerificationResult {
   employee_id: string;
 }
 
+export interface ClientLogoutNotificationResult {
+  message: string;
+}
+
 export type AuthStateListener = (session: EssAuthSession | null) => void;
 
 export interface EssAuthClientOptions {

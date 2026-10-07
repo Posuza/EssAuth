@@ -50,7 +50,7 @@ if (auth.employeeId) {
 }
 
 document.querySelector("#login").onclick = () => auth.login();
-document.querySelector("#logout").onclick = () => auth.logout();
+document.querySelector("#logout").onclick = async () => auth.logout();
 ```
 
 ### `EssAuth.init(options)`
@@ -74,7 +74,11 @@ from `EssAuth.init()` when ESS returns to the client page.
 
 ### `auth.logout()`
 
-Clears the employee ID and the SDK's local session for the current client.
+Clears the employee ID and the SDK's local session for the current client, then
+sends an internal logout notification containing the configured public key and
+verified employee ID to ESS for audit logging. Consumers do not build or send
+that payload themselves. This notification does not revoke a server session or
+token.
 
 ## Local testing
 

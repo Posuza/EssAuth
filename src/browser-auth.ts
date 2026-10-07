@@ -91,8 +91,12 @@ export class EssAuth {
     globalThis.location.assign(login.toString());
   }
 
-  logout(): void {
+  async logout(): Promise<void> {
+    const employeeId = this.employeeId;
     this.clearIdentity();
+    if (!employeeId) return;
+
+    await this.client.notifyClientLogout(employeeId);
   }
 
   private async initialize(): Promise<void> {

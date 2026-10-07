@@ -28,7 +28,7 @@ export declare class EssAuth {
     private constructor();
     static init(options: EssAuthInitOptions): Promise<EssAuth>;
     login(): void;
-    logout(): void;
+    logout(): Promise<void>;
     private initialize;
     private restoreIdentity;
     private clearIdentity;

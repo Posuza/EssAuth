@@ -4,5 +4,5 @@ export { EssAuthError } from "./errors.js";
 export { MemoryStorage } from "./storage.js";
 export { getClient, getSession, getUser, login, logout, start, verifyTicket } from "./singleton.js";
 export type { EssAuthInitOptions } from "./browser-auth.js";
-export type { AuthStateListener, ClientTicketVerificationResult, EmployeeProfile, EssAuthClientOptions, EssAuthSession, FaceEnrollInput, FaceEnrollResult, FaceVerifyInput, FaceVerifyResult, LoginCredentials, LoginResponse, LogoutResponse, StorageLike, } from "./types.js";
+export type { AuthStateListener, ClientLogoutNotificationResult, ClientTicketVerificationResult, EmployeeProfile, EssAuthClientOptions, EssAuthSession, FaceEnrollInput, FaceEnrollResult, FaceVerifyInput, FaceVerifyResult, LoginCredentials, LoginResponse, LogoutResponse, StorageLike, } from "./types.js";
 //# sourceMappingURL=index.d.ts.map

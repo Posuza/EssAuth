@@ -1,4 +1,4 @@
-import type { AuthStateListener, ClientTicketVerificationResult, EmployeeProfile, EssAuthClientOptions, EssAuthSession, FaceEnrollInput, FaceEnrollResult, FaceVerifyInput, FaceVerifyResult, LoginCredentials, LogoutResponse } from "./types.js";
+import type { AuthStateListener, ClientLogoutNotificationResult, ClientTicketVerificationResult, EmployeeProfile, EssAuthClientOptions, EssAuthSession, FaceEnrollInput, FaceEnrollResult, FaceVerifyInput, FaceVerifyResult, LoginCredentials, LogoutResponse } from "./types.js";
 export declare class EssAuthClient {
     readonly baseUrl: string;
     readonly publicKey: string | null;
@@ -21,6 +21,7 @@ export declare class EssAuthClient {
     verifyFace(input: FaceVerifyInput): Promise<FaceVerifyResult>;
     enrollFace(input: FaceEnrollInput): Promise<FaceEnrollResult>;
     verifyTicket(ticket: string): Promise<ClientTicketVerificationResult>;
+    notifyClientLogout(employeeId: string): Promise<ClientLogoutNotificationResult>;
     private setSession;
     private url;
     private send;

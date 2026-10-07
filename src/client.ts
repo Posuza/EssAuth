@@ -2,6 +2,7 @@ import { connectionError, EssAuthError, responseError } from "./errors.js";
 import { defaultStorage, MemoryStorage } from "./storage.js";
 import type {
   AuthStateListener,
+  ClientLogoutNotificationResult,
   ClientTicketVerificationResult,
   EmployeeProfile,
   EssAuthClientOptions,
@@ -212,6 +213,24 @@ export class EssAuthClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ public_key: this.publicKey, ticket: normalizedTicket }),
     }, false, "Ticket verification failed.");
+  }
+
+  async notifyClientLogout(employeeId: string): Promise<ClientLogoutNotificationResult> {
+    if (!this.publicKey) {
+      throw new EssAuthError("A registered client public key is required.", {
+        code: "CLIENT_PUBLIC_KEY_REQUIRED",
+      });
+    }
+    const employeeCode = normalizeEmployeeCode(employeeId);
+    return this.json<ClientLogoutNotificationResult>("/client-auth/logout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        public_key: this.publicKey,
+        employee_id: employeeCode,
+      }),
+      keepalive: true,
+    }, false, "Logout notification failed.");
   }
 
   private setSession(session: EssAuthSession | null): void {
