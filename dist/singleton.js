@@ -31,4 +31,7 @@ export function getUser() {
 export function getSession() {
     return configuredClient().getSession();
 }
+export function verifyTicket(ticket) {
+    return configuredClient().verifyTicket(ticket);
+}
 //# sourceMappingURL=singleton.js.map

@@ -1,80 +1,96 @@
 # EssAuth SDK
 
-Standalone browser SDK for the current ESS backend. It covers employee login,
-session persistence, identity-aware API requests, and face profile operations.
-It does not modify or depend on the existing frontend application.
+Browser SDK for redirect-based ESS authentication. Client applications use
+three methods only: `init`, `login`, and `logout`. The SDK handles the ESS
+redirect, ticket verification, callback URL cleanup, and session persistence.
 
 ## Install
 
-Install the latest code directly from GitHub:
-
-```bash
-npm install github:Posuza/EssAuth
-```
-
-For a reproducible installation, use a tagged release:
+Install a tagged release from GitHub:
 
 ```bash
 npm install github:Posuza/EssAuth#v0.1.0
 ```
 
-The package has no runtime dependencies. The repository includes the compiled
-`dist` output, while the `prepare` script rebuilds it when npm installs from Git.
+Or load the compiled SDK directly from the ESS CDN:
 
-## Start and log in
-
-```ts
-import { getClient, getUser, login, logout, start } from "@ess/auth-o1";
-
-start({ baseUrl: "http://127.0.0.1:8000/api/v1" });
-
-await login({ employeeCode: "680708", password: "123456" });
-console.log(getUser());
-
-const directory = await getClient().request("/employee-directory");
-await logout();
+```js
+import EssAuth from "https://ess.example.com/sdk/v0.1.0/index.js";
 ```
 
-`request()` automatically adds the backend's current `X-Employee-Code` header.
-It accepts only paths belonging to the configured API, preventing identity
-headers from being sent to another origin.
+The CDN must host the complete `dist` directory because its ES modules import
+one another.
 
-## Use an isolated client
+## Use
 
-```ts
-import { EssAuthClient } from "@ess/auth-o1";
+```js
+import EssAuth from "@ess/auth-o1";
 
-const auth = new EssAuthClient({ baseUrl: "/api/v1" });
-auth.start();
+const auth = await EssAuth.init({
+  publicKey: "your-registered-public-key",
+});
 
-await auth.login({ employeeCode: "680708", password: "123456" });
+if (auth.error) {
+  console.error(auth.error.message);
+}
 
-const result = await auth.verifyFace({
-  employeeCode: "680708",
-  imageDataUrl: "data:image/jpeg;base64,...",
+if (auth.employeeId) {
+  console.log("Authenticated employee:", auth.employeeId);
+}
+
+document.querySelector("#login").onclick = () => auth.login();
+document.querySelector("#logout").onclick = () => auth.logout();
+```
+
+### `EssAuth.init(options)`
+
+Call this once whenever the page loads. It automatically:
+
+- reads an ESS ticket from the callback URL;
+- verifies the ticket with the configured public key;
+- removes the ticket from the browser URL;
+- stores the verified employee ID in `sessionStorage`; and
+- restores that employee ID on later page loads.
+
+The returned object exposes `employeeId` and `error`. The client never reads or
+verifies a ticket itself.
+
+### `auth.login()`
+
+Redirects to ESS with the registered public key and the current page as the
+callback URL. A full-page redirect means the employee ID becomes available
+from `EssAuth.init()` when ESS returns to the client page.
+
+### `auth.logout()`
+
+Clears the employee ID and the SDK's local session for the current client.
+
+## Local testing
+
+The test build defaults to:
+
+- API: `http://127.0.0.1:8000/api/v1`
+- Login: `http://127.0.0.1:5173/client-auth/login`
+
+Self-hosted and local environments can override either endpoint:
+
+```js
+const auth = await EssAuth.init({
+  publicKey: "your-registered-public-key",
+  apiUrl: "http://127.0.0.1:8000/api/v1",
+  loginUrl: "http://127.0.0.1:5173/client-auth/login",
 });
 ```
 
-Available face methods are `lookupEmployee`, `getProfileImage`, `verifyFace`,
-and `enrollFace`. All public methods and response objects are fully typed.
-Pass `storage: null` to keep the session in memory instead of session storage.
+Production CDN builds should set their deployment defaults so ordinary HTML
+clients need to provide only `publicKey`.
 
-## Current authentication boundary
+## Security boundary
 
-The current backend login response contains an employee profile, but no access
-token, refresh token, cookie, or session-verification endpoint. EssAuth stores
-that profile in `sessionStorage` and uses the server's existing employee-code
-identity header for protected requests. This preserves the current behavior but
-is not a cryptographically verifiable session.
+The public key is safe to include in browser code. Never put an application
+private key or another secret in an HTML page.
 
-When the backend adds OAuth authorization and token endpoints, the transport can
-move to bearer tokens without changing the SDK's `start`, `login`, `logout`,
-`getUser`, or `request` entry points.
-
-## Development
-
-```bash
-npm install
-npm test
-npm run check
-```
+The SDK stores only a verified employee ID in `sessionStorage`. This is useful
+for client-side identity and UI state, but it is not a secure authorization
+session. Applications protecting sensitive APIs should exchange the ESS result
+on their backend and use a secure `HttpOnly` session cookie.

@@ -40,3 +40,7 @@ export function getUser() {
 export function getSession() {
   return configuredClient().getSession();
 }
+
+export function verifyTicket(ticket: string) {
+  return configuredClient().verifyTicket(ticket);
+}

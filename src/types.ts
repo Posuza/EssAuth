@@ -68,11 +68,17 @@ export interface FaceEnrollResult {
   profile_image_updated_at: string | null;
 }
 
+export interface ClientTicketVerificationResult {
+  employee_id: string;
+}
+
 export type AuthStateListener = (session: EssAuthSession | null) => void;
 
 export interface EssAuthClientOptions {
-  /** API root including the version prefix. Defaults to `/api/v1`. */
+  /** API root including the version prefix. Defaults to `http://localhost:8000/api/v1`. */
   baseUrl?: string;
+  /** Public identifier assigned when the client application is registered. */
+  publicKey?: string;
   /** Storage used for the session. Defaults to sessionStorage; null keeps it in memory. */
   storage?: StorageLike | null;
   storageKey?: string;

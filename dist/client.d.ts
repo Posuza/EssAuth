@@ -1,6 +1,7 @@
-import type { AuthStateListener, EmployeeProfile, EssAuthClientOptions, EssAuthSession, FaceEnrollInput, FaceEnrollResult, FaceVerifyInput, FaceVerifyResult, LoginCredentials, LogoutResponse } from "./types.js";
+import type { AuthStateListener, ClientTicketVerificationResult, EmployeeProfile, EssAuthClientOptions, EssAuthSession, FaceEnrollInput, FaceEnrollResult, FaceVerifyInput, FaceVerifyResult, LoginCredentials, LogoutResponse } from "./types.js";
 export declare class EssAuthClient {
     readonly baseUrl: string;
+    readonly publicKey: string | null;
     private readonly storage;
     private readonly storageKey;
     private readonly fetcher;
@@ -19,6 +20,7 @@ export declare class EssAuthClient {
     getProfileImage(employeeCode: string): Promise<Blob | null>;
     verifyFace(input: FaceVerifyInput): Promise<FaceVerifyResult>;
     enrollFace(input: FaceEnrollInput): Promise<FaceEnrollResult>;
+    verifyTicket(ticket: string): Promise<ClientTicketVerificationResult>;
     private setSession;
     private url;
     private send;

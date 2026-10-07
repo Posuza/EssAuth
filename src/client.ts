@@ -2,6 +2,7 @@ import { connectionError, EssAuthError, responseError } from "./errors.js";
 import { defaultStorage, MemoryStorage } from "./storage.js";
 import type {
   AuthStateListener,
+  ClientTicketVerificationResult,
   EmployeeProfile,
   EssAuthClientOptions,
   EssAuthSession,
@@ -16,6 +17,7 @@ import type {
 } from "./types.js";
 
 const DEFAULT_STORAGE_KEY = "ess-auth-o1.session.v1";
+const DEFAULT_BASE_URL = "http://localhost:8000/api/v1";
 const EMPLOYEE_CODE = /^[A-Za-z0-9]{6}$/;
 
 function normalizeBaseUrl(value: string): string {
@@ -54,6 +56,7 @@ function isSession(value: unknown): value is EssAuthSession {
 
 export class EssAuthClient {
   readonly baseUrl: string;
+  readonly publicKey: string | null;
   private readonly storage: StorageLike;
   private readonly storageKey: string;
   private readonly fetcher: typeof globalThis.fetch;
@@ -61,7 +64,8 @@ export class EssAuthClient {
   private session: EssAuthSession | null = null;
 
   constructor(options: EssAuthClientOptions = {}) {
-    this.baseUrl = normalizeBaseUrl(options.baseUrl ?? "/api/v1");
+    this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
+    this.publicKey = options.publicKey?.trim() || null;
     this.storage = options.storage === null
       ? new MemoryStorage()
       : options.storage ?? defaultStorage();
@@ -191,6 +195,23 @@ export class EssAuthClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }, true, "Face enrollment failed.");
+  }
+
+  async verifyTicket(ticket: string): Promise<ClientTicketVerificationResult> {
+    if (!this.publicKey) {
+      throw new EssAuthError("A registered client public key is required.", {
+        code: "CLIENT_PUBLIC_KEY_REQUIRED",
+      });
+    }
+    const normalizedTicket = ticket.trim();
+    if (!normalizedTicket) {
+      throw new EssAuthError("Ticket cannot be empty.", { code: "INVALID_CLIENT_TICKET" });
+    }
+    return this.json<ClientTicketVerificationResult>("/client-auth/tickets/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ public_key: this.publicKey, ticket: normalizedTicket }),
+    }, false, "Ticket verification failed.");
   }
 
   private setSession(session: EssAuthSession | null): void {

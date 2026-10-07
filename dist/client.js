@@ -1,6 +1,7 @@
 import { connectionError, EssAuthError, responseError } from "./errors.js";
 import { defaultStorage, MemoryStorage } from "./storage.js";
 const DEFAULT_STORAGE_KEY = "ess-auth-o1.session.v1";
+const DEFAULT_BASE_URL = "http://localhost:8000/api/v1";
 const EMPLOYEE_CODE = /^[A-Za-z0-9]{6}$/;
 function normalizeBaseUrl(value) {
     const normalized = value.trim().replace(/\/+$/, "");
@@ -37,13 +38,15 @@ function isSession(value) {
 }
 export class EssAuthClient {
     baseUrl;
+    publicKey;
     storage;
     storageKey;
     fetcher;
     listeners = new Set();
     session = null;
     constructor(options = {}) {
-        this.baseUrl = normalizeBaseUrl(options.baseUrl ?? "/api/v1");
+        this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
+        this.publicKey = options.publicKey?.trim() || null;
         this.storage = options.storage === null
             ? new MemoryStorage()
             : options.storage ?? defaultStorage();
@@ -152,6 +155,22 @@ export class EssAuthClient {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
         }, true, "Face enrollment failed.");
+    }
+    async verifyTicket(ticket) {
+        if (!this.publicKey) {
+            throw new EssAuthError("A registered client public key is required.", {
+                code: "CLIENT_PUBLIC_KEY_REQUIRED",
+            });
+        }
+        const normalizedTicket = ticket.trim();
+        if (!normalizedTicket) {
+            throw new EssAuthError("Ticket cannot be empty.", { code: "INVALID_CLIENT_TICKET" });
+        }
+        return this.json("/client-auth/tickets/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ public_key: this.publicKey, ticket: normalizedTicket }),
+        }, false, "Ticket verification failed.");
     }
     setSession(session) {
         this.session = session;

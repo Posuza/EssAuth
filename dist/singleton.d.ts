@@ -6,4 +6,5 @@ export declare function login(credentials: LoginCredentials): Promise<import("./
 export declare function logout(): Promise<import("./types.js").LogoutResponse | null>;
 export declare function getUser(): import("./types.js").EmployeeProfile | null;
 export declare function getSession(): import("./types.js").EssAuthSession | null;
+export declare function verifyTicket(ticket: string): Promise<import("./types.js").ClientTicketVerificationResult>;
 //# sourceMappingURL=singleton.d.ts.map
