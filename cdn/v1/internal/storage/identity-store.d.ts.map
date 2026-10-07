@@ -1,0 +1,1 @@
+{"version":3,"file":"identity-store.d.ts","sourceRoot":"","sources":["../../../src/internal/storage/identity-store.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,WAAW,EAAE,MAAM,uBAAuB,CAAC;AAOzD,qBAAa,aAAa;;gBAKZ,OAAO,EAAE,WAAW,EAAE,UAAU,EAAE,MAAM,EAAE,SAAS,EAAE,MAAM;IAMvE,OAAO,IAAI,MAAM,GAAG,IAAI;IAoBxB,IAAI,CAAC,UAAU,EAAE,MAAM,GAAG,IAAI;IAO9B,KAAK,IAAI,IAAI;CAGd"}

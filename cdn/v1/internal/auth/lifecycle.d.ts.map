@@ -1,0 +1,1 @@
+{"version":3,"file":"lifecycle.d.ts","sourceRoot":"","sources":["../../../src/internal/auth/lifecycle.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,aAAa,EAAE,MAAM,8BAA8B,CAAC;AAE7D,OAAO,EAAE,aAAa,EAAE,MAAM,qBAAqB,CAAC;AACpD,OAAO,KAAK,EAAE,kBAAkB,EAAE,MAAM,uBAAuB,CAAC;AAEhE,wBAAsB,kBAAkB,CACtC,QAAQ,EAAE,aAAa,EACvB,OAAO,EAAE,aAAa,GACrB,OAAO,CAAC,kBAAkB,CAAC,CAqB7B"}

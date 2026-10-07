@@ -1,9 +1,9 @@
-import { resolveConfig } from "../internal/config.js";
-import { IdentityStorage } from "../internal/identity-storage.js";
-import { initializeIdentity } from "../internal/lifecycle.js";
-import { redirectToLogin } from "../internal/redirect.js";
-import { TicketService } from "../internal/ticket.js";
-import { JsonTransport } from "../internal/transport.js";
+import { initializeIdentity } from "../internal/auth/lifecycle.js";
+import { redirectToLogin } from "../internal/auth/redirect.js";
+import { TicketService } from "../internal/auth/ticket-service.js";
+import { resolveConfig } from "../internal/core/config.js";
+import { IdentityStore } from "../internal/storage/identity-store.js";
+import { FetchTransport } from "../internal/transport/fetch-transport.js";
 import type { EssAuthInitOptions } from "./types.js";
 
 /** Public redirect-authentication facade for client applications. */
@@ -13,21 +13,21 @@ export class EssAuth {
 
   readonly #publicKey: string;
   readonly #loginUrl: string;
-  readonly #identity: IdentityStorage;
+  readonly #identity: IdentityStore;
   readonly #tickets: TicketService;
 
   private constructor(options: EssAuthInitOptions) {
     const config = resolveConfig(options);
     this.#publicKey = config.publicKey;
     this.#loginUrl = config.loginUrl;
-    this.#identity = new IdentityStorage(
+    this.#identity = new IdentityStore(
       config.storage,
       config.storageKey,
       config.publicKey,
     );
     this.#tickets = new TicketService(
       config.publicKey,
-      new JsonTransport(config.apiUrl, config.fetcher),
+      new FetchTransport(config.apiUrl, config.fetcher),
     );
   }
 
