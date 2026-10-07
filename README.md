@@ -54,6 +54,83 @@ document.querySelector("#login").onclick = () => auth.login();
 document.querySelector("#logout").onclick = async () => auth.logout();
 ```
 
+Only `publicKey` is required by the SDK. An application name belongs to the ESS
+registry and may also be used by the client UI, but it is not passed to
+`EssAuth.init()`.
+
+## Plain HTML
+
+HTML clients may keep the registered key in a data attribute:
+
+```html
+<body data-public-key="Ab3dE6gH9jKm2NpQ">
+  <button id="login">Sign in with ESS</button>
+  <button id="logout">Sign out</button>
+
+  <script type="module">
+    import EssAuth from "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@main/cdn/v1/index.js";
+
+    const auth = await EssAuth.init({
+      publicKey: document.body.dataset.publicKey,
+    });
+
+    document.querySelector("#login").onclick = () => auth.login();
+    document.querySelector("#logout").onclick = () => auth.logout();
+  </script>
+</body>
+```
+
+`data-app-name` is optional client display data. ESS identifies the registered
+application from `publicKey`.
+
+## React or Vite with the CDN
+
+Store the public key in the application's environment configuration:
+
+```dotenv
+VITE_ESS_PUBLIC_KEY=Ab3dE6gH9jKm2NpQ
+```
+
+Create one shared SDK module. Do not initialize a separate instance inside each
+component or route:
+
+```js
+// src/ess-auth.js
+const SDK_URL =
+  "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@main/cdn/v1/index.js";
+
+let authPromise;
+
+export function getEssAuth() {
+  authPromise ??= import(/* @vite-ignore */ SDK_URL).then(({ default: EssAuth }) =>
+    EssAuth.init({ publicKey: import.meta.env.VITE_ESS_PUBLIC_KEY }),
+  );
+  return authPromise;
+}
+
+export async function loginWithEss() {
+  (await getEssAuth()).login();
+}
+
+export async function logoutFromEss() {
+  await (await getEssAuth()).logout();
+}
+```
+
+Initialize it once when the application starts so callback tickets are handled
+on every route reload:
+
+```js
+const auth = await getEssAuth();
+
+if (auth.error) console.error(auth.error.message);
+if (auth.employeeId) console.log(auth.employeeId);
+```
+
+Components call `loginWithEss()` and `logoutFromEss()` from the shared module.
+React routing on the same origin keeps the SDK identity available in the same
+browser tab.
+
 ### `EssAuth.init(options)`
 
 Call this once whenever the page loads. It automatically:
