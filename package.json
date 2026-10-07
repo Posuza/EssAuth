@@ -27,6 +27,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
+    "publish:cdn": "npm run build && node scripts/publish-cdn.mjs",
     "test": "npm run build && node --test",
     "prepare": "npm run build"
   },

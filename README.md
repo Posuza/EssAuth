@@ -15,12 +15,22 @@ npm install github:Posuza/EssAuth#v0.1.0
 Or load the compiled SDK directly from the ESS CDN:
 
 ```js
-import EssAuth from "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@main/dist/index.js";
+import EssAuth from "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@main/cdn/v1/index.js";
 ```
 
-jsDelivr serves the complete compiled `dist` directory directly from GitHub.
-The stable `@main` URL follows compatible SDK updates without requiring clients
-to change their import URL.
+The `cdn/v1` directory is the separately managed client release. Normal SDK
+builds update `dist` only and do not change what CDN clients receive. Publish a
+tested compatible build deliberately with:
+
+```bash
+npm run publish:cdn
+git add cdn/v1
+git commit -m "Publish SDK CDN v1"
+git push
+```
+
+The stable client URL does not change. Create `cdn/v2` only for a future
+breaking API version.
 
 ## Use
 
