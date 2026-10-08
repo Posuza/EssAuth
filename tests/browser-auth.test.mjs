@@ -166,3 +166,38 @@ test("logout clears restored identity when the notification request fails", asyn
   assert.equal(auth.employeeId, null);
   assert.equal(storage.values.size, 0);
 });
+
+test("callback rejection is returned as an SDK error without another login loop", async (context) => {
+  const originalLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
+  const originalHistory = Object.getOwnPropertyDescriptor(globalThis, "history");
+  context.after(() => {
+    if (originalLocation) Object.defineProperty(globalThis, "location", originalLocation);
+    else delete globalThis.location;
+    if (originalHistory) Object.defineProperty(globalThis, "history", originalHistory);
+    else delete globalThis.history;
+  });
+
+  let cleanedUrl = null;
+  Object.defineProperty(globalThis, "location", {
+    configurable: true,
+    value: { href: "https://client.example.test/?essauth_error=invalid_callback" },
+  });
+  Object.defineProperty(globalThis, "history", {
+    configurable: true,
+    value: {
+      state: null,
+      replaceState(_state, _title, url) {
+        cleanedUrl = url;
+      },
+    },
+  });
+
+  const auth = await EssAuth.init({
+    publicKey: "Ab3dE6gH9jKm2NpQ",
+    storage: memoryStorage(),
+  });
+
+  assert.equal(auth.employeeId, null);
+  assert.equal(auth.error?.code, "INVALID_CALLBACK");
+  assert.equal(new URL(cleanedUrl).searchParams.has("essauth_error"), false);
+});

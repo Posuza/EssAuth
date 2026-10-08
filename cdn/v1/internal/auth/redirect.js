@@ -18,8 +18,12 @@ export function redirectToLogin(loginUrl, publicKey) {
 export function callbackTicket(url) {
     return url.searchParams.get("ticket");
 }
+export function callbackError(url) {
+    return url.searchParams.get("essauth_error");
+}
 export function cleanCallbackUrl(url) {
     url.searchParams.delete("ticket");
+    url.searchParams.delete("essauth_error");
     globalThis.history.replaceState(globalThis.history.state, "", url.toString());
 }
 //# sourceMappingURL=redirect.js.map

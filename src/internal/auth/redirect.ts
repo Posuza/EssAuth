@@ -23,7 +23,12 @@ export function callbackTicket(url: URL): string | null {
   return url.searchParams.get("ticket");
 }
 
+export function callbackError(url: URL): string | null {
+  return url.searchParams.get("essauth_error");
+}
+
 export function cleanCallbackUrl(url: URL): void {
   url.searchParams.delete("ticket");
+  url.searchParams.delete("essauth_error");
   globalThis.history.replaceState(globalThis.history.state, "", url.toString());
 }

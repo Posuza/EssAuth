@@ -19,7 +19,7 @@ npm install github:Posuza/EssAuth#v0.1.0
 Or load the compiled SDK directly from the ESS CDN:
 
 ```js
-import EssAuth from "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@main/cdn/v1/index.js";
+import EssAuth from "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@1/cdn/v1/index.js";
 ```
 
 The `cdn/v1` directory is the separately managed client release. Normal SDK
@@ -71,7 +71,7 @@ HTML clients may keep the registered key in a data attribute:
   <button id="logout">Sign out</button>
 
   <script type="module">
-    import EssAuth from "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@main/cdn/v1/index.js";
+    import EssAuth from "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@1/cdn/v1/index.js";
 
     const auth = await EssAuth.init({
       publicKey: document.body.dataset.publicKey,
@@ -100,7 +100,7 @@ component or route:
 ```js
 // src/ess-auth.js
 const SDK_URL =
-  "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@main/cdn/v1/index.js";
+  "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@1/cdn/v1/index.js";
 
 let authPromise;
 
@@ -143,6 +143,11 @@ Call this once whenever the page loads. It automatically:
 - removes the ticket from the browser URL;
 - stores the verified employee ID in `sessionStorage`; and
 - restores that employee ID on later page loads.
+
+If ESS rejects a callback address, it may return the browser to the registered
+application origin with `essauth_error`. `EssAuth.init()` removes that marker
+and returns it as `auth.error`, preventing applications that automatically call
+`auth.login()` from entering a redirect loop.
 
 The returned object exposes `employeeId` and `error`. The client never reads or
 verifies a ticket itself.
