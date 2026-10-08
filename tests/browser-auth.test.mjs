@@ -70,9 +70,11 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
 
   const fetch = async (url, init) => {
     requests.push({ url, body: JSON.parse(init.body), keepalive: init.keepalive ?? false });
-    const response = url.endsWith("/client-auth/logout")
-      ? { message: "Logout notification recorded." }
-      : { employee_id: "680708" };
+    const response = url.endsWith("/client-auth/callback/validate")
+      ? { valid: true }
+      : url.endsWith("/client-auth/logout")
+        ? { message: "Logout notification recorded." }
+        : { employee_id: "680708" };
     return new Response(JSON.stringify(response), {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -90,24 +92,34 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
 
   assert.equal(auth.employeeId, "680708");
   assert.equal(auth.error, null);
-  assert.deepEqual(requests, [{
-    url: "https://api.example.test/api/v1/client-auth/tickets/verify",
-    body: {
-      public_key: "Ab3dE6gH9jKm2NpQ",
-      ticket: "opaque-ticket",
+  assert.deepEqual(requests, [
+    {
+      url: "https://api.example.test/api/v1/client-auth/callback/validate",
+      body: {
+        public_key: "Ab3dE6gH9jKm2NpQ",
+        return_to: "https://client.example.test/payroll?view=summary&ticket=opaque-ticket#totals",
+      },
+      keepalive: false,
     },
-    keepalive: false,
-  }]);
+    {
+      url: "https://api.example.test/api/v1/client-auth/tickets/verify",
+      body: {
+        public_key: "Ab3dE6gH9jKm2NpQ",
+        ticket: "opaque-ticket",
+      },
+      keepalive: false,
+    },
+  ]);
   assert.equal(new URL(cleanedUrl).searchParams.has("ticket"), false);
 
   const restored = await EssAuth.init(options);
   assert.equal(restored.employeeId, "680708");
-  assert.equal(requests.length, 1);
+  assert.equal(requests.length, 3);
 
   await restored.logout();
   assert.equal(restored.employeeId, null);
   assert.equal(storage.values.size, 0);
-  assert.deepEqual(requests[1], {
+  assert.deepEqual(requests[3], {
     url: "https://api.example.test/api/v1/client-auth/logout",
     body: {
       public_key: "Ab3dE6gH9jKm2NpQ",
@@ -118,7 +130,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
 
   const loggedOut = await EssAuth.init(options);
   assert.equal(loggedOut.employeeId, null);
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 5);
 
   loggedOut.login();
   const redirect = new URL(assignedUrl);
@@ -156,7 +168,13 @@ test("logout clears restored identity when the notification request fails", asyn
   const auth = await EssAuth.init({
     publicKey,
     storage,
-    fetch: async () => {
+    fetch: async (url) => {
+      if (url.endsWith("/client-auth/callback/validate")) {
+        return new Response(JSON.stringify({ valid: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
       throw new TypeError("offline");
     },
   });
@@ -195,9 +213,55 @@ test("callback rejection is returned as an SDK error without another login loop"
   const auth = await EssAuth.init({
     publicKey: "Ab3dE6gH9jKm2NpQ",
     storage: memoryStorage(),
+    fetch: async () => new Response(JSON.stringify({ valid: true }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
   });
 
   assert.equal(auth.employeeId, null);
   assert.equal(auth.error?.code, "INVALID_CALLBACK");
   assert.equal(new URL(cleanedUrl).searchParams.has("essauth_error"), false);
+});
+
+test("failed preflight keeps the client on its page and disables login", async (context) => {
+  const originalLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
+  const originalHistory = Object.getOwnPropertyDescriptor(globalThis, "history");
+  context.after(() => {
+    if (originalLocation) Object.defineProperty(globalThis, "location", originalLocation);
+    else delete globalThis.location;
+    if (originalHistory) Object.defineProperty(globalThis, "history", originalHistory);
+    else delete globalThis.history;
+  });
+
+  let assignedUrl = null;
+  Object.defineProperty(globalThis, "location", {
+    configurable: true,
+    value: {
+      href: "https://unregistered.example.test/",
+      assign(url) {
+        assignedUrl = url;
+      },
+    },
+  });
+  Object.defineProperty(globalThis, "history", {
+    configurable: true,
+    value: { state: null, replaceState() {} },
+  });
+
+  const auth = await EssAuth.init({
+    publicKey: "Ab3dE6gH9jKm2NpQ",
+    storage: memoryStorage(),
+    fetch: async () => new Response(JSON.stringify({
+      detail: { message: "Callback URL is not registered." },
+    }), {
+      status: 403,
+      headers: { "content-type": "application/json" },
+    }),
+  });
+
+  assert.equal(auth.employeeId, null);
+  assert.equal(auth.error?.code, "HTTP_403");
+  assert.throws(() => auth.login(), (error) => error?.code === "CLIENT_VALIDATION_REQUIRED");
+  assert.equal(assignedUrl, null);
 });

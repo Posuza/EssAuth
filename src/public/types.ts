@@ -21,4 +21,5 @@ export interface EssAuthInitOptions {
 export interface AuthInitialization {
   employeeId: string | null;
   error: Error | null;
+  callbackValidated: boolean;
 }

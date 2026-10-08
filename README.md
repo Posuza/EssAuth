@@ -138,6 +138,7 @@ browser tab.
 
 Call this once whenever the page loads. It automatically:
 
+- validates the public key, current page origin, and backend IP-block status;
 - reads an ESS ticket from the callback URL;
 - verifies the ticket with the configured public key;
 - removes the ticket from the browser URL;
@@ -150,7 +151,9 @@ and returns it as `auth.error`, preventing applications that automatically call
 `auth.login()` from entering a redirect loop.
 
 The returned object exposes `employeeId` and `error`. The client never reads or
-verifies a ticket itself.
+verifies a ticket itself. When preflight validation fails, the SDK returns the
+backend error and disables `auth.login()`, so the browser remains on the client
+page even if application code tries to start login.
 
 ### `auth.login()`
 
