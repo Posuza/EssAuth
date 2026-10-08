@@ -33,6 +33,10 @@ git commit -m "Publish SDK CDN v1"
 git push
 ```
 
+The published `cdn/v1/index.js` is a self-contained browser bundle. Keeping the
+CDN entry in one file prevents a floating major-version URL from temporarily
+mixing cached internal modules from different compatible releases.
+
 The stable client URL does not change. Create `cdn/v2` only for a future
 breaking API version.
 

@@ -1,6 +1,6 @@
 {
   "name": "@ess/auth-o1",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Browser SDK for redirect-based ESS authentication",
   "repository": {
     "type": "git",
@@ -33,6 +33,7 @@
     "prepare": "npm run build"
   },
   "devDependencies": {
+    "esbuild": "^0.27.2",
     "typescript": "^5.9.3"
   },
   "engines": {
