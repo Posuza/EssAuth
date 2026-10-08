@@ -22,8 +22,10 @@ src/
     │   ├── browser-storage.ts # browser storage fallback
     │   └── identity-store.ts  # per-app sessionStorage identity
     └── transport/
+        ├── presence-transport.ts # live client-presence capability
         ├── request-transport.ts # protocol-independent request contract
-        └── fetch-transport.ts   # Fetch-based HTTP implementation
+        ├── fetch-transport.ts   # Fetch-based HTTP implementation
+        └── websocket-presence-transport.ts # heartbeat connection
 ```
 
 ## Dependency rules
@@ -40,6 +42,8 @@ src/
 7. A compatible `cdn/v1` release cannot add another public method or export.
 8. Feature services depend on `RequestTransport`, so transport implementations
    can change without changing the public facade.
+9. WebSocket presence is an operational signal only. It must never authorize a
+   user or replace ticket verification.
 
 ## Future features
 
@@ -48,14 +52,14 @@ an `internal/telemetry/` feature folder, send through `RequestTransport`, and
 trigger it from `auth/lifecycle.ts` or the facade. It must remain invisible to
 integrators.
 
-Add heartbeat support only after ticket verification returns an opaque server
-session identifier. Store that identifier internally, place scheduling in an
-`internal/heartbeat/` feature folder, and stop it during logout. The public
-logout call must remain `auth.logout()` with no arguments.
+The presence WebSocket reports that a registered client application is online.
+It sends only the public application key during connection and a small
+heartbeat message afterward. The backend observes network metadata from the
+connection. Presence does not receive an employee ID and is not authentication.
 
-A `WebSocketTransport` should be added only when the backend defines a matching
-request/response protocol. It can implement `RequestTransport`; client code
-must still use `EssAuth.init()`, `auth.login()`, and `auth.logout()` unchanged.
+Any future authenticated session heartbeat still requires an opaque server
+session identifier. It must use a separate feature contract and must not change
+`EssAuth.init()`, `auth.login()`, or `auth.logout()`.
 
 IP blocking, operating-system policy, rate limits, allowed callback URLs, and
 application activation are server or reverse-proxy responsibilities. Browser

@@ -7,11 +7,11 @@ package root and use `EssAuth.init()`, `auth.login()`, and `auth.logout()`.
   initialization lifecycle.
 - `core/` validates SDK configuration and normalizes internal errors.
 - `storage/` owns browser-storage fallback and the per-application identity.
-- `transport/` defines the request contract and contains its Fetch
-  implementation. Endpoint services depend on the contract, not on Fetch.
+- `transport/` defines separate request and presence contracts. Fetch handles
+  request/response calls; WebSocket handles test client-presence heartbeats.
 
 Future telemetry should be added as its own feature folder and coordinated by
-`auth/lifecycle.ts`. Heartbeats should be added only after ESS provides an
-opaque server session identifier; they belong in a separate feature folder and
-must not change the public facade. IP and OS policy enforcement belongs to
-ESS/Caddy, not to browser SDK modules.
+`auth/lifecycle.ts`. Current presence heartbeats identify only the registered
+application and must not be used as user authentication. Authenticated session
+heartbeats require an opaque server session identifier. IP and OS policy
+enforcement belongs to ESS/Caddy, not to browser SDK modules.
