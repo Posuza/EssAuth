@@ -173,10 +173,18 @@ async function initializeIdentity(identity, tickets, callbacks) {
   const url = browserUrl();
   const returnedError = callbackError(url);
   const ticket = callbackTicket(url);
+  const restoredEmployeeId = !ticket && !returnedError ? identity.restore() : null;
   try {
     await callbacks.validate(url.toString());
   } catch (error) {
     cleanCallbackUrl(url);
+    if (restoredEmployeeId && error instanceof EssAuthError && error.code === "NETWORK_ERROR") {
+      return {
+        employeeId: restoredEmployeeId,
+        error: null,
+        callbackValidated: false
+      };
+    }
     return {
       employeeId: null,
       error: error instanceof Error ? error : new Error("ESS client validation failed."),
@@ -196,7 +204,7 @@ async function initializeIdentity(identity, tickets, callbacks) {
   }
   if (!ticket) {
     return {
-      employeeId: identity.restore(),
+      employeeId: restoredEmployeeId,
       error: null,
       callbackValidated: true
     };
@@ -280,6 +288,34 @@ function resolveConfig(options) {
   };
 }
 
+// src/internal/storage/presence-identity.ts
+var DEVICE_STORAGE_PREFIX = "ess-auth-o1.device.v1";
+function randomId() {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+}
+function deviceId(publicKey) {
+  const key = `${DEVICE_STORAGE_PREFIX}.${publicKey}`;
+  try {
+    const stored = globalThis.localStorage?.getItem(key)?.trim();
+    if (stored) return stored;
+    const created = randomId();
+    globalThis.localStorage?.setItem(key, created);
+    return created;
+  } catch {
+    return randomId();
+  }
+}
+function createPresenceIdentity(publicKey, employeeId) {
+  return {
+    publicKey,
+    employeeId,
+    deviceId: deviceId(publicKey)
+  };
+}
+
 // src/internal/transport/fetch-transport.ts
 var FetchTransport = class {
   #baseUrl;
@@ -316,7 +352,7 @@ var WebSocketPresenceTransport = class {
   #heartbeatIntervalMs;
   #reconnectDelayMs;
   #active = false;
-  #publicKey = "";
+  #identity = null;
   #socket = null;
   #heartbeatTimer = null;
   #reconnectTimer = null;
@@ -326,11 +362,11 @@ var WebSocketPresenceTransport = class {
     this.#heartbeatIntervalMs = heartbeatIntervalMs;
     this.#reconnectDelayMs = reconnectDelayMs;
   }
-  connect(publicKey) {
+  connect(identity) {
     this.disconnect();
     if (!this.#webSocketConstructor) return;
     this.#active = true;
-    this.#publicKey = publicKey;
+    this.#identity = identity;
     this.#openSocket();
   }
   disconnect() {
@@ -342,6 +378,7 @@ var WebSocketPresenceTransport = class {
     }
     const socket = this.#socket;
     this.#socket = null;
+    this.#identity = null;
     if (socket && socket.readyState < 2) socket.close(1e3, "Client stopped");
   }
   #openSocket() {
@@ -350,7 +387,8 @@ var WebSocketPresenceTransport = class {
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.pathname = `${url.pathname.replace(/\/+$/, "")}/client-auth/presence/ws`;
     url.search = "";
-    url.searchParams.set("public_key", this.#publicKey);
+    if (!this.#identity) return;
+    url.searchParams.set("public_key", this.#identity.publicKey);
     const socket = new this.#webSocketConstructor(url);
     this.#socket = socket;
     socket.onopen = () => {
@@ -374,8 +412,12 @@ var WebSocketPresenceTransport = class {
     };
   }
   #sendHeartbeat(socket) {
-    if (this.#socket !== socket || socket.readyState !== 1) return;
-    socket.send(JSON.stringify({ type: "heartbeat" }));
+    if (this.#socket !== socket || socket.readyState !== 1 || !this.#identity) return;
+    socket.send(JSON.stringify({
+      type: "heartbeat",
+      employee_id: this.#identity.employeeId,
+      device_id: this.#identity.deviceId
+    }));
   }
   #clearHeartbeatTimer() {
     if (this.#heartbeatTimer === null) return;
@@ -422,7 +464,11 @@ var EssAuth = class _EssAuth {
     auth.employeeId = result.employeeId;
     auth.error = result.error;
     auth.#callbackValidated = result.callbackValidated;
-    if (result.callbackValidated) auth.#presence.connect(auth.#publicKey);
+    if (result.callbackValidated && result.employeeId) {
+      auth.#presence.connect(
+        createPresenceIdentity(auth.#publicKey, result.employeeId)
+      );
+    }
     return auth;
   }
   login() {
@@ -434,14 +480,19 @@ var EssAuth = class _EssAuth {
       this.error = error;
       throw error;
     }
+    this.#presence.disconnect();
     this.#clearIdentity();
     redirectToLogin(this.#loginUrl, this.#publicKey);
   }
   async logout() {
     const employeeId = this.employeeId;
+    this.#presence.disconnect();
     this.#clearIdentity();
     if (!employeeId) return;
-    await this.#tickets.notifyLogout(employeeId);
+    try {
+      await this.#tickets.notifyLogout(employeeId);
+    } catch {
+    }
   }
   #clearIdentity() {
     this.employeeId = null;

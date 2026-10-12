@@ -140,7 +140,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
   assert.equal(loggedOut.employeeId, null);
 });
 
-test("logout clears restored identity when the notification request fails", async (context) => {
+test("offline initialization restores identity and logout remains local-first", async (context) => {
   const originalLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
   const originalHistory = Object.getOwnPropertyDescriptor(globalThis, "history");
   context.after(() => {
@@ -168,19 +168,12 @@ test("logout clears restored identity when the notification request fails", asyn
   const auth = await EssAuth.init({
     publicKey,
     storage,
-    fetch: async (url) => {
-      if (url.endsWith("/client-auth/callback/validate")) {
-        return new Response(JSON.stringify({ valid: true }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      }
-      throw new TypeError("offline");
-    },
+    fetch: async () => { throw new TypeError("offline"); },
   });
 
   assert.equal(auth.employeeId, "680708");
-  await assert.rejects(auth.logout(), (error) => error?.code === "NETWORK_ERROR");
+  assert.equal(auth.error, null);
+  await auth.logout();
   assert.equal(auth.employeeId, null);
   assert.equal(storage.values.size, 0);
 });

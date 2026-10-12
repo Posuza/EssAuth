@@ -52,10 +52,11 @@ an `internal/telemetry/` feature folder, send through `RequestTransport`, and
 trigger it from `auth/lifecycle.ts` or the facade. It must remain invisible to
 integrators.
 
-The presence WebSocket reports that a registered client application is online.
-It sends only the public application key during connection and a small
-heartbeat message afterward. The backend observes network metadata from the
-connection. Presence does not receive an employee ID and is not authentication.
+The presence WebSocket starts only after authentication. It sends the public
+application key plus the verified employee ID, a browser-profile device ID,
+and no tab identity. The backend groups active clients by public application
+key, employee, and device, so duplicate tabs do not become separate clients.
+Presence remains operational telemetry and is not authorization.
 
 Any future authenticated session heartbeat still requires an opaque server
 session identifier. It must use a separate feature contract and must not change

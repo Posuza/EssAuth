@@ -1,4 +1,7 @@
-import type { PresenceTransport } from "./presence-transport.js";
+import type {
+  PresenceIdentity,
+  PresenceTransport,
+} from "./presence-transport.js";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const RECONNECT_DELAY_MS = 5_000;
@@ -10,7 +13,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
   readonly #reconnectDelayMs: number;
 
   #active = false;
-  #publicKey = "";
+  #identity: PresenceIdentity | null = null;
   #socket: WebSocket | null = null;
   #heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   #reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -27,12 +30,12 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     this.#reconnectDelayMs = reconnectDelayMs;
   }
 
-  connect(publicKey: string): void {
+  connect(identity: PresenceIdentity): void {
     this.disconnect();
     if (!this.#webSocketConstructor) return;
 
     this.#active = true;
-    this.#publicKey = publicKey;
+    this.#identity = identity;
     this.#openSocket();
   }
 
@@ -46,6 +49,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
 
     const socket = this.#socket;
     this.#socket = null;
+    this.#identity = null;
     if (socket && socket.readyState < 2) socket.close(1000, "Client stopped");
   }
 
@@ -56,7 +60,8 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.pathname = `${url.pathname.replace(/\/+$/, "")}/client-auth/presence/ws`;
     url.search = "";
-    url.searchParams.set("public_key", this.#publicKey);
+    if (!this.#identity) return;
+    url.searchParams.set("public_key", this.#identity.publicKey);
 
     const socket = new this.#webSocketConstructor(url);
     this.#socket = socket;
@@ -83,8 +88,16 @@ export class WebSocketPresenceTransport implements PresenceTransport {
   }
 
   #sendHeartbeat(socket: WebSocket): void {
-    if (this.#socket !== socket || socket.readyState !== 1) return;
-    socket.send(JSON.stringify({ type: "heartbeat" }));
+    if (
+      this.#socket !== socket
+      || socket.readyState !== 1
+      || !this.#identity
+    ) return;
+    socket.send(JSON.stringify({
+      type: "heartbeat",
+      employee_id: this.#identity.employeeId,
+      device_id: this.#identity.deviceId,
+    }));
   }
 
   #clearHeartbeatTimer(): void {

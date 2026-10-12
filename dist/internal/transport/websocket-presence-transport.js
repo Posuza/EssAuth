@@ -6,7 +6,7 @@ export class WebSocketPresenceTransport {
     #heartbeatIntervalMs;
     #reconnectDelayMs;
     #active = false;
-    #publicKey = "";
+    #identity = null;
     #socket = null;
     #heartbeatTimer = null;
     #reconnectTimer = null;
@@ -16,12 +16,12 @@ export class WebSocketPresenceTransport {
         this.#heartbeatIntervalMs = heartbeatIntervalMs;
         this.#reconnectDelayMs = reconnectDelayMs;
     }
-    connect(publicKey) {
+    connect(identity) {
         this.disconnect();
         if (!this.#webSocketConstructor)
             return;
         this.#active = true;
-        this.#publicKey = publicKey;
+        this.#identity = identity;
         this.#openSocket();
     }
     disconnect() {
@@ -33,6 +33,7 @@ export class WebSocketPresenceTransport {
         }
         const socket = this.#socket;
         this.#socket = null;
+        this.#identity = null;
         if (socket && socket.readyState < 2)
             socket.close(1000, "Client stopped");
     }
@@ -43,7 +44,9 @@ export class WebSocketPresenceTransport {
         url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
         url.pathname = `${url.pathname.replace(/\/+$/, "")}/client-auth/presence/ws`;
         url.search = "";
-        url.searchParams.set("public_key", this.#publicKey);
+        if (!this.#identity)
+            return;
+        url.searchParams.set("public_key", this.#identity.publicKey);
         const socket = new this.#webSocketConstructor(url);
         this.#socket = socket;
         socket.onopen = () => {
@@ -68,9 +71,15 @@ export class WebSocketPresenceTransport {
         };
     }
     #sendHeartbeat(socket) {
-        if (this.#socket !== socket || socket.readyState !== 1)
+        if (this.#socket !== socket
+            || socket.readyState !== 1
+            || !this.#identity)
             return;
-        socket.send(JSON.stringify({ type: "heartbeat" }));
+        socket.send(JSON.stringify({
+            type: "heartbeat",
+            employee_id: this.#identity.employeeId,
+            device_id: this.#identity.deviceId,
+        }));
     }
     #clearHeartbeatTimer() {
         if (this.#heartbeatTimer === null)

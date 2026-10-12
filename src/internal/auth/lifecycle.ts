@@ -18,11 +18,25 @@ export async function initializeIdentity(
   const url = browserUrl();
   const returnedError = callbackError(url);
   const ticket = callbackTicket(url);
+  const restoredEmployeeId = !ticket && !returnedError
+    ? identity.restore()
+    : null;
 
   try {
     await callbacks.validate(url.toString());
   } catch (error) {
     cleanCallbackUrl(url);
+    if (
+      restoredEmployeeId
+      && error instanceof EssAuthError
+      && error.code === "NETWORK_ERROR"
+    ) {
+      return {
+        employeeId: restoredEmployeeId,
+        error: null,
+        callbackValidated: false,
+      };
+    }
     return {
       employeeId: null,
       error: error instanceof Error ? error : new Error("ESS client validation failed."),
@@ -46,7 +60,7 @@ export async function initializeIdentity(
 
   if (!ticket) {
     return {
-      employeeId: identity.restore(),
+      employeeId: restoredEmployeeId,
       error: null,
       callbackValidated: true,
     };

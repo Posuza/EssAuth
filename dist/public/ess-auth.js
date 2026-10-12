@@ -5,6 +5,7 @@ import { EssAuthError } from "../internal/core/errors.js";
 import { TicketService } from "../internal/auth/ticket-service.js";
 import { resolveConfig } from "../internal/core/config.js";
 import { IdentityStore } from "../internal/storage/identity-store.js";
+import { createPresenceIdentity } from "../internal/storage/presence-identity.js";
 import { FetchTransport } from "../internal/transport/fetch-transport.js";
 import { WebSocketPresenceTransport } from "../internal/transport/websocket-presence-transport.js";
 /** Public redirect-authentication facade for client applications. */
@@ -37,8 +38,9 @@ export class EssAuth {
         auth.employeeId = result.employeeId;
         auth.error = result.error;
         auth.#callbackValidated = result.callbackValidated;
-        if (result.callbackValidated)
-            auth.#presence.connect(auth.#publicKey);
+        if (result.callbackValidated && result.employeeId) {
+            auth.#presence.connect(createPresenceIdentity(auth.#publicKey, result.employeeId));
+        }
         return auth;
     }
     login() {
@@ -47,15 +49,23 @@ export class EssAuth {
             this.error = error;
             throw error;
         }
+        this.#presence.disconnect();
         this.#clearIdentity();
         redirectToLogin(this.#loginUrl, this.#publicKey);
     }
     async logout() {
         const employeeId = this.employeeId;
+        this.#presence.disconnect();
         this.#clearIdentity();
         if (!employeeId)
             return;
-        await this.#tickets.notifyLogout(employeeId);
+        try {
+            await this.#tickets.notifyLogout(employeeId);
+        }
+        catch {
+            // Logout is local-first. ESS notification is operational and must not
+            // keep a client signed in when the central service is unavailable.
+        }
     }
     #clearIdentity() {
         this.employeeId = null;

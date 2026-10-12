@@ -34,7 +34,7 @@ class FakeWebSocket {
   }
 }
 
-test("presence transport connects by public key and sends a heartbeat", () => {
+test("presence transport connects after authentication with user and device identity", () => {
   FakeWebSocket.instances = [];
   const presence = new WebSocketPresenceTransport(
     "https://ess.example.test/api/v1",
@@ -43,7 +43,11 @@ test("presence transport connects by public key and sends a heartbeat", () => {
     60_000,
   );
 
-  presence.connect("Tg2wbdIU3C0JRfSX");
+  presence.connect({
+    publicKey: "Tg2wbdIU3C0JRfSX",
+    employeeId: "680708",
+    deviceId: "device_test_1234",
+  });
   const socket = FakeWebSocket.instances[0];
   const url = new URL(socket.url);
   assert.equal(url.protocol, "wss:");
@@ -51,7 +55,11 @@ test("presence transport connects by public key and sends a heartbeat", () => {
   assert.equal(url.searchParams.get("public_key"), "Tg2wbdIU3C0JRfSX");
 
   socket.open();
-  assert.deepEqual(socket.sent, [JSON.stringify({ type: "heartbeat" })]);
+  assert.deepEqual(socket.sent, [JSON.stringify({
+    type: "heartbeat",
+    employee_id: "680708",
+    device_id: "device_test_1234",
+  })]);
 
   presence.disconnect();
   assert.equal(socket.closeCode, 1000);

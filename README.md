@@ -149,6 +149,18 @@ Call this once whenever the page loads. It automatically:
 - stores the verified employee ID in `sessionStorage`; and
 - restores that employee ID on later page loads.
 
+Presence starts only when an employee identity has been verified or restored
+while ESS is reachable. It uses a device ID shared through `localStorage`.
+The backend groups by public application key, employee ID, and device ID, so
+multiple tabs are not mistaken for separate active clients while different
+applications on the same device remain separate.
+
+If ESS is temporarily unreachable during a later page load, an identity that
+was already verified and stored for this client is restored without blocking
+the client application. This offline fallback applies only to network failure;
+an explicit ESS rejection still fails closed, and a new login still requires
+ESS.
+
 If ESS rejects a callback address, it may return the browser to the registered
 application origin with `essauth_error`. `EssAuth.init()` removes that marker
 and returns it as `auth.error`, preventing applications that automatically call
@@ -168,10 +180,10 @@ from `EssAuth.init()` when ESS returns to the client page.
 ### `auth.logout()`
 
 Clears the employee ID and the SDK's local session for the current client, then
-sends an internal logout notification containing the configured public key and
-verified employee ID to ESS for audit logging. Consumers do not build or send
-that payload themselves. This notification does not revoke a server session or
-token.
+sends a best-effort logout notification containing the configured public key
+and verified employee ID to ESS for audit logging. Consumers do not build or
+send that payload themselves. A notification failure never prevents local
+logout. This notification does not revoke a server session or token.
 
 ## Local testing
 
