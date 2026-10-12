@@ -10,35 +10,25 @@ rules, and the extension points for future telemetry and heartbeat support.
 
 ## Install
 
-Install a tagged release from GitHub:
+Choose the integration that matches the client application:
 
-```bash
-npm install github:Posuza/EssAuth#v0.1.0
-```
+- [Installation and CDN options](./docs/INSTALLATION.md)
+- [Plain HTML integration](./docs/PLAIN_HTML.md)
+- [React and Vite integration](./docs/REACT_VITE.md)
 
-Or load the compiled SDK directly from the ESS CDN:
+For an automatic CDN channel, client applications load the floating
+`release-v1` bundle with a five-minute URL bucket:
 
 ```js
-import EssAuth from "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@1/cdn/v1/index.js";
+const bucket = Math.floor(Date.now() / 300_000);
+const sdkUrl =
+  `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@release-v1/cdn/v1/index.js?v=${bucket}`;
+const { default: EssAuth } = await import(sdkUrl);
 ```
 
-The `cdn/v1` directory is the separately managed client release. Normal SDK
-builds update `dist` only and do not change what CDN clients receive. Publish a
-tested compatible build deliberately with:
-
-```bash
-npm run publish:cdn
-git add cdn/v1
-git commit -m "Publish SDK CDN v1"
-git push
-```
-
-The published `cdn/v1/index.js` is a self-contained browser bundle. Keeping the
-CDN entry in one file prevents a floating major-version URL from temporarily
-mixing cached internal modules from different compatible releases.
-
-The stable client URL does not change. Create `cdn/v2` only for a future
-breaking API version.
+This one-time client loader allows compatible SDK updates without changing or
+restarting the client application server. An already-open page must reload
+before it can execute newly published JavaScript.
 
 ## Use
 
@@ -65,97 +55,6 @@ Only `publicKey` is required by the SDK. An application name belongs to the ESS
 registry and may also be used by the client UI, but it is not passed to
 `EssAuth.init()`.
 
-## Plain HTML
-
-HTML clients may keep the registered key in a data attribute:
-
-```html
-<body data-public-key="Ab3dE6gH9jKm2NpQ">
-  <button id="login">Sign in with ESS</button>
-  <button id="logout">Sign out</button>
-
-  <script type="module">
-    // The time bucket refreshes the floating v1 release at most once every
-    // five minutes without requiring a client deployment for each SDK update.
-    const sdkVersionBucket = Math.floor(Date.now() / 300_000);
-    const sdkUrl =
-      `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@release-v1/cdn/v1/index.js?v=${sdkVersionBucket}`;
-    const { default: EssAuth } = await import(sdkUrl);
-
-    const auth = await EssAuth.init({
-      publicKey: document.body.dataset.publicKey,
-    });
-
-    if (!auth.employeeId && !auth.error) auth.login();
-    if (auth.error) console.error(auth.error.message);
-
-    document.querySelector("#login").onclick = () => auth.login();
-    document.querySelector("#logout").onclick = () => auth.logout();
-  </script>
-</body>
-```
-
-`data-app-name` is optional client display data. ESS identifies the registered
-application from `publicKey`.
-
-## React or Vite with the CDN
-
-Store the public key in the application's environment configuration:
-
-```dotenv
-VITE_ESS_PUBLIC_KEY=Ab3dE6gH9jKm2NpQ
-```
-
-Create one shared SDK module. Do not initialize a separate instance inside each
-component or route:
-
-```js
-// src/ess-auth.js
-const sdkVersionBucket = Math.floor(Date.now() / 300_000);
-const SDK_URL =
-  `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@release-v1/cdn/v1/index.js?v=${sdkVersionBucket}`;
-
-let authPromise;
-
-export function getEssAuth() {
-  authPromise ??= import(/* @vite-ignore */ SDK_URL).then(({ default: EssAuth }) =>
-    EssAuth.init({ publicKey: import.meta.env.VITE_ESS_PUBLIC_KEY }),
-  );
-  return authPromise;
-}
-
-export async function loginWithEss() {
-  (await getEssAuth()).login();
-}
-
-export async function logoutFromEss() {
-  await (await getEssAuth()).logout();
-}
-```
-
-Initialize it once when the application starts so callback tickets are handled
-on every route reload:
-
-```js
-const auth = await getEssAuth();
-
-if (auth.error) console.error(auth.error.message);
-else if (auth.employeeId) console.log(auth.employeeId);
-else auth.login();
-```
-
-Components call `loginWithEss()` and `logoutFromEss()` from the shared module.
-The client does not parse callback tickets, persist the employee ID, create a
-presence WebSocket, or construct an ESS logout request. The SDK owns those
-steps. A full page reload is required before an already-open page can execute a
-newly published SDK; restarting the client development server is not required.
-
-The five-minute query bucket is recommended for clients that follow the
-floating `release-v1` channel. It avoids indefinitely reusing a browser-cached
-bundle while still allowing ordinary CDN caching. Clients that require a
-reviewed, reproducible dependency should instead pin an immutable release such
-as `@v1.2.0` and update that URL as part of their own deployment process.
-
 ## Client login flow
 
 Every browser client follows the same integration flow, regardless of whether
@@ -173,6 +72,10 @@ it uses plain HTML, React, Vue, or another frontend framework:
 5. Call `await auth.logout()` before clearing the application's own UI state.
    The SDK removes its stored identity first and treats ESS notification as
    best effort.
+
+The client does not parse callback tickets, persist the SDK employee identity,
+create a presence WebSocket, or construct an ESS logout request. The SDK owns
+those operations.
 
 ### `EssAuth.init(options)`
 
