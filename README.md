@@ -146,21 +146,24 @@ Call this once whenever the page loads. It automatically:
 - reads an ESS ticket from the callback URL;
 - verifies the ticket with the configured public key;
 - removes the ticket from the browser URL;
-- stores the verified employee ID in `sessionStorage`; and
+- stores verified employee sessions in shared `localStorage` with a tab-local
+  active employee pointer; and
 - restores that employee ID on later page loads.
 
-Presence starts when an employee identity has been verified or restored. It
-uses a device ID shared through `localStorage` and reconnects independently
-when ESS becomes reachable again.
-The backend groups by public application key, employee ID, and device ID, so
-multiple tabs are not mistaken for separate active clients while different
-applications on the same device remain separate.
+Presence starts when an employee identity has been verified or restored. Web
+Locks elect one presence-owning tab for each public application, employee, and
+device. Matching tabs remain on standby and automatically take ownership when
+the leader closes. Different applications, employees, or devices use separate
+connections. Browsers without Web Locks fall back to one connection per tab,
+while backend counting still deduplicates the logical clients.
 
 On a later page load, an identity already verified and stored for this client
-is restored without making another ESS request. This keeps an existing client
-session independent from ESS outages and avoids browser CORS noise from an
-unavailable proxy. New logins and returned callback tickets still require ESS,
-and an explicit callback rejection still fails closed.
+is restored without making another ESS request. Each local record is scoped by
+public key and employee ID, while a small `sessionStorage` pointer selects the
+active employee independently in each tab. This allows different employees to
+use the same client in separate tabs without overwriting each other. New logins
+and returned callback tickets still require ESS, and an explicit callback
+rejection still fails closed.
 
 If ESS rejects a callback address, it may return the browser to the registered
 application origin with `essauth_error`. `EssAuth.init()` removes that marker
@@ -211,7 +214,10 @@ clients need to provide only `publicKey`.
 The public key is safe to include in browser code. Never put an application
 private key or another secret in an HTML page.
 
-The SDK stores only a verified employee ID in `sessionStorage`. This is useful
-for client-side identity and UI state, but it is not a secure authorization
-session. Applications protecting sensitive APIs should exchange the ESS result
-on their backend and use a secure `HttpOnly` session cookie.
+The SDK stores verified employee records in `localStorage` and an active
+employee pointer in each tab's `sessionStorage`. Logout removes only the active
+client and employee record; the browser storage event clears matching tabs and
+stops their presence connection. This is useful for client-side identity and
+UI state, but it is not a secure authorization session. Applications
+protecting sensitive APIs should exchange the ESS result on their backend and
+use a secure `HttpOnly` session cookie.

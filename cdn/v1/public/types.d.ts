@@ -10,7 +10,7 @@ export interface EssAuthInitOptions {
     apiUrl?: string;
     /** Override only when testing locally or using a self-hosted ESS login page. */
     loginUrl?: string;
-    /** Defaults to sessionStorage. */
+    /** Override the SDK's coordinated localStorage/sessionStorage persistence. */
     storage?: StorageLike | null;
     storageKey?: string;
     /** Injectable transport for tests and non-standard browser environments. */

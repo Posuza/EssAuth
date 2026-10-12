@@ -6,7 +6,8 @@ package root and use `EssAuth.init()`, `auth.login()`, and `auth.logout()`.
 - `auth/` owns redirect behavior, ticket/logout endpoint contracts, and the
   initialization lifecycle.
 - `core/` validates SDK configuration and normalizes internal errors.
-- `storage/` owns browser-storage fallback and the per-application identity.
+- `storage/` owns coordinated local/tab persistence, migration, and identities
+  scoped by application and employee.
 - `transport/` defines separate request and presence contracts. Fetch handles
   request/response calls; WebSocket handles test client-presence heartbeats.
 

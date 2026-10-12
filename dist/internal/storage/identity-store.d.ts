@@ -5,5 +5,6 @@ export declare class IdentityStore {
     restore(): string | null;
     save(employeeId: string): void;
     clear(): void;
+    onRemoved(employeeId: string, listener: () => void): () => void;
 }
 //# sourceMappingURL=identity-store.d.ts.map

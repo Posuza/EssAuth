@@ -31,6 +31,11 @@ var IdentityStore = class {
   clear() {
     this.#storage.removeItem(this.#storageKey);
   }
+  onRemoved(employeeId, listener) {
+    const coordinated = this.#storage;
+    return coordinated.subscribe?.(this.#storageKey, employeeId, listener) ?? (() => {
+    });
+  }
 };
 
 // src/internal/core/errors.ts
@@ -238,14 +243,79 @@ var MemoryStorage = class {
     this.#values.delete(key);
   }
 };
-function defaultStorage() {
+function browserStorage(name) {
   try {
-    if (typeof globalThis.sessionStorage !== "undefined") {
-      return globalThis.sessionStorage;
-    }
+    return globalThis[name] ?? null;
   } catch {
+    return null;
   }
-  return new MemoryStorage();
+}
+function employeeIdFromValue(value) {
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed.employeeId === "string" && parsed.employeeId.trim() ? parsed.employeeId.trim() : null;
+  } catch {
+    return null;
+  }
+}
+var BrowserIdentityStorage = class {
+  #local;
+  #session;
+  constructor(local, session) {
+    this.#local = local;
+    this.#session = session;
+  }
+  getItem(key) {
+    const activeKey = `${key}.active`;
+    const activeEmployeeId = this.#session.getItem(activeKey)?.trim();
+    if (activeEmployeeId) {
+      const stored = this.#local.getItem(`${key}.${activeEmployeeId}`);
+      if (stored) return stored;
+      this.#session.removeItem(activeKey);
+    }
+    const legacy = this.#session.getItem(key);
+    if (!legacy) return null;
+    const employeeId = employeeIdFromValue(legacy);
+    if (!employeeId) {
+      this.#session.removeItem(key);
+      return null;
+    }
+    this.setItem(key, legacy);
+    return legacy;
+  }
+  setItem(key, value) {
+    const employeeId = employeeIdFromValue(value);
+    if (!employeeId) throw new Error("SDK identity requires an employee ID");
+    this.#local.setItem(`${key}.${employeeId}`, value);
+    this.#session.setItem(`${key}.active`, employeeId);
+    this.#session.removeItem(key);
+  }
+  removeItem(key) {
+    const activeKey = `${key}.active`;
+    const employeeId = this.#session.getItem(activeKey)?.trim();
+    if (employeeId) this.#local.removeItem(`${key}.${employeeId}`);
+    this.#session.removeItem(activeKey);
+    this.#session.removeItem(key);
+  }
+  subscribe(key, employeeId, onRemoved) {
+    if (typeof globalThis.addEventListener !== "function") return () => {
+    };
+    const recordKey = `${key}.${employeeId}`;
+    const listener = (event) => {
+      if (event.storageArea !== globalThis.localStorage) return;
+      if (event.key !== recordKey || event.newValue !== null) return;
+      this.#session.removeItem(`${key}.active`);
+      onRemoved();
+    };
+    globalThis.addEventListener("storage", listener);
+    return () => globalThis.removeEventListener("storage", listener);
+  }
+};
+function defaultStorage() {
+  const local = browserStorage("localStorage");
+  const session = browserStorage("sessionStorage");
+  if (local && session) return new BrowserIdentityStorage(local, session);
+  return session ?? local ?? new MemoryStorage();
 }
 
 // src/internal/core/config.ts
@@ -346,31 +416,48 @@ var FetchTransport = class {
 // src/internal/transport/websocket-presence-transport.ts
 var HEARTBEAT_INTERVAL_MS = 15e3;
 var RECONNECT_DELAY_MS = 5e3;
+function defaultLockManager() {
+  try {
+    return globalThis.navigator?.locks ?? null;
+  } catch {
+    return null;
+  }
+}
 var WebSocketPresenceTransport = class {
   #apiUrl;
   #webSocketConstructor;
   #heartbeatIntervalMs;
   #reconnectDelayMs;
+  #lockManager;
   #active = false;
   #identity = null;
   #socket = null;
   #heartbeatTimer = null;
   #reconnectTimer = null;
-  constructor(apiUrl, webSocketConstructor, heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS, reconnectDelayMs = RECONNECT_DELAY_MS) {
+  #lockAbortController = null;
+  #releaseLock = null;
+  #generation = 0;
+  constructor(apiUrl, webSocketConstructor, heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS, reconnectDelayMs = RECONNECT_DELAY_MS, lockManager = defaultLockManager()) {
     this.#apiUrl = apiUrl;
     this.#webSocketConstructor = webSocketConstructor;
     this.#heartbeatIntervalMs = heartbeatIntervalMs;
     this.#reconnectDelayMs = reconnectDelayMs;
+    this.#lockManager = lockManager;
   }
   connect(identity) {
     this.disconnect();
     if (!this.#webSocketConstructor) return;
     this.#active = true;
     this.#identity = identity;
-    this.#openSocket();
+    this.#startPresenceOwner();
   }
   disconnect() {
     this.#active = false;
+    this.#generation++;
+    this.#releaseLock?.();
+    this.#releaseLock = null;
+    this.#lockAbortController?.abort();
+    this.#lockAbortController = null;
     this.#clearHeartbeatTimer();
     if (this.#reconnectTimer !== null) {
       clearTimeout(this.#reconnectTimer);
@@ -381,6 +468,38 @@ var WebSocketPresenceTransport = class {
     this.#identity = null;
     if (socket && socket.readyState < 2) socket.close(1e3, "Client stopped");
   }
+  #startPresenceOwner() {
+    if (!this.#active || !this.#identity) return;
+    if (!this.#lockManager) {
+      this.#openSocket();
+      return;
+    }
+    const identity = this.#identity;
+    const generation = ++this.#generation;
+    const abortController = new AbortController();
+    this.#lockAbortController = abortController;
+    const lockName = [
+      "ess-auth-o1.presence.v1",
+      identity.publicKey,
+      identity.employeeId,
+      identity.deviceId
+    ].join(":");
+    void this.#lockManager.request(
+      lockName,
+      { signal: abortController.signal },
+      async () => {
+        if (!this.#active || generation !== this.#generation) return;
+        await new Promise((resolve) => {
+          this.#releaseLock = resolve;
+          this.#openSocket();
+        });
+        if (generation === this.#generation) this.#releaseLock = null;
+      }
+    ).catch((error) => {
+      if (error?.name !== "AbortError") {
+      }
+    });
+  }
   #openSocket() {
     if (!this.#active || !this.#webSocketConstructor) return;
     const url = new URL(this.#apiUrl);
@@ -389,6 +508,8 @@ var WebSocketPresenceTransport = class {
     url.search = "";
     if (!this.#identity) return;
     url.searchParams.set("public_key", this.#identity.publicKey);
+    url.searchParams.set("employee_id", this.#identity.employeeId);
+    url.searchParams.set("device_id", this.#identity.deviceId);
     const socket = new this.#webSocketConstructor(url);
     this.#socket = socket;
     socket.onopen = () => {
@@ -401,10 +522,14 @@ var WebSocketPresenceTransport = class {
     };
     socket.onerror = () => {
     };
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       if (this.#socket === socket) this.#socket = null;
       this.#clearHeartbeatTimer();
       if (!this.#active) return;
+      if (event.code === 1003 || event.code === 1008) {
+        this.#active = false;
+        return;
+      }
       this.#reconnectTimer = setTimeout(() => {
         this.#reconnectTimer = null;
         this.#openSocket();
@@ -437,6 +562,7 @@ var EssAuth = class _EssAuth {
   #callbacks;
   #presence;
   #callbackValidated = false;
+  #unsubscribeIdentity = null;
   constructor(options) {
     const config = resolveConfig(options);
     this.#publicKey = config.publicKey;
@@ -468,6 +594,10 @@ var EssAuth = class _EssAuth {
       auth.#presence.connect(
         createPresenceIdentity(auth.#publicKey, result.employeeId)
       );
+      auth.#unsubscribeIdentity = auth.#identity.onRemoved(
+        result.employeeId,
+        () => auth.#handleRemoteLogout()
+      );
     }
     return auth;
   }
@@ -495,9 +625,21 @@ var EssAuth = class _EssAuth {
     }
   }
   #clearIdentity() {
+    this.#unsubscribeIdentity?.();
+    this.#unsubscribeIdentity = null;
     this.employeeId = null;
     this.error = null;
     this.#identity.clear();
+  }
+  #handleRemoteLogout() {
+    this.#unsubscribeIdentity?.();
+    this.#unsubscribeIdentity = null;
+    this.#presence.disconnect();
+    this.employeeId = null;
+    this.error = null;
+    if (typeof globalThis.location?.reload === "function") {
+      globalThis.location.reload();
+    }
   }
 };
 export {

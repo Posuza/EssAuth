@@ -31,5 +31,10 @@ export class IdentityStore {
     clear() {
         this.#storage.removeItem(this.#storageKey);
     }
+    onRemoved(employeeId, listener) {
+        const coordinated = this.#storage;
+        return coordinated.subscribe?.(this.#storageKey, employeeId, listener)
+            ?? (() => { });
+    }
 }
 //# sourceMappingURL=identity-store.js.map

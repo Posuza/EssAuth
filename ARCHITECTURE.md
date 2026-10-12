@@ -19,8 +19,8 @@ src/
     │   ├── config.ts          # validated runtime configuration
     │   └── errors.ts          # normalized internal errors
     ├── storage/
-    │   ├── browser-storage.ts # browser storage fallback
-    │   └── identity-store.ts  # per-app sessionStorage identity
+    │   ├── browser-storage.ts # coordinated device/tab persistence
+    │   └── identity-store.ts  # per-client and employee identity
     └── transport/
         ├── presence-transport.ts # live client-presence capability
         ├── request-transport.ts # protocol-independent request contract
@@ -52,11 +52,12 @@ an `internal/telemetry/` feature folder, send through `RequestTransport`, and
 trigger it from `auth/lifecycle.ts` or the facade. It must remain invisible to
 integrators.
 
-The presence WebSocket starts only after authentication. It sends the public
-application key plus the verified employee ID, a browser-profile device ID,
-and no tab identity. The backend groups active clients by public application
-key, employee, and device, so duplicate tabs do not become separate clients.
-Presence remains operational telemetry and is not authorization.
+The presence WebSocket starts only after authentication. Its connection URL
+contains the public application key, verified employee ID, and browser-profile
+device ID. Web Locks elect one connection-owning tab for each tuple, and the
+backend also groups by that tuple as a fallback. Different applications or
+employees on the same device remain separate clients. Presence remains
+operational telemetry and is not authorization.
 
 Any future authenticated session heartbeat still requires an opaque server
 session identifier. It must use a separate feature contract and must not change

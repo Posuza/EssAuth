@@ -1,4 +1,5 @@
 import type { StorageLike } from "../../public/types.js";
+import type { CoordinatedIdentityStorage } from "./browser-storage.js";
 
 type StoredIdentity = {
   employeeId: string;
@@ -45,5 +46,11 @@ export class IdentityStore {
 
   clear(): void {
     this.#storage.removeItem(this.#storageKey);
+  }
+
+  onRemoved(employeeId: string, listener: () => void): () => void {
+    const coordinated = this.#storage as Partial<CoordinatedIdentityStorage>;
+    return coordinated.subscribe?.(this.#storageKey, employeeId, listener)
+      ?? (() => {});
   }
 }

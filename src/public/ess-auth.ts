@@ -23,6 +23,7 @@ export class EssAuth {
   readonly #callbacks: CallbackService;
   readonly #presence: PresenceTransport;
   #callbackValidated = false;
+  #unsubscribeIdentity: (() => void) | null = null;
 
   private constructor(options: EssAuthInitOptions) {
     const config = resolveConfig(options);
@@ -59,6 +60,10 @@ export class EssAuth {
       auth.#presence.connect(
         createPresenceIdentity(auth.#publicKey, result.employeeId),
       );
+      auth.#unsubscribeIdentity = auth.#identity.onRemoved(
+        result.employeeId,
+        () => auth.#handleRemoteLogout(),
+      );
     }
     return auth;
   }
@@ -91,9 +96,22 @@ export class EssAuth {
   }
 
   #clearIdentity(): void {
+    this.#unsubscribeIdentity?.();
+    this.#unsubscribeIdentity = null;
     this.employeeId = null;
     this.error = null;
     this.#identity.clear();
+  }
+
+  #handleRemoteLogout(): void {
+    this.#unsubscribeIdentity?.();
+    this.#unsubscribeIdentity = null;
+    this.#presence.disconnect();
+    this.employeeId = null;
+    this.error = null;
+    if (typeof globalThis.location?.reload === "function") {
+      globalThis.location.reload();
+    }
   }
 }
 
