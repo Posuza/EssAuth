@@ -13,6 +13,7 @@ type PresenceLocation = {
 };
 
 type PresenceGeolocation = Pick<Geolocation, "getCurrentPosition">;
+type PresenceLocationStorage = Pick<Storage, "getItem">;
 
 type PresenceLockManager = {
   request(
@@ -38,6 +39,14 @@ function defaultGeolocation(): PresenceGeolocation | null {
   }
 }
 
+function defaultLocationStorage(): PresenceLocationStorage | null {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export class WebSocketPresenceTransport implements PresenceTransport {
   readonly #apiUrl: string;
   readonly #webSocketConstructor: typeof WebSocket | null;
@@ -45,6 +54,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
   readonly #reconnectDelayMs: number;
   readonly #lockManager: PresenceLockManager | null;
   readonly #geolocation: PresenceGeolocation | null;
+  readonly #locationStorage: PresenceLocationStorage | null;
 
   #active = false;
   #identity: PresenceIdentity | null = null;
@@ -68,6 +78,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     reconnectDelayMs = RECONNECT_DELAY_MS,
     lockManager: PresenceLockManager | null = defaultLockManager(),
     geolocation: PresenceGeolocation | null = defaultGeolocation(),
+    locationStorage: PresenceLocationStorage | null = defaultLocationStorage(),
   ) {
     this.#apiUrl = apiUrl;
     this.#webSocketConstructor = webSocketConstructor;
@@ -75,6 +86,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     this.#reconnectDelayMs = reconnectDelayMs;
     this.#lockManager = lockManager;
     this.#geolocation = geolocation;
+    this.#locationStorage = locationStorage;
   }
 
   connect(identity: PresenceIdentity): void {
@@ -157,6 +169,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     url.pathname = `${url.pathname.replace(/\/+$/, "")}/client-auth/presence/ws`;
     url.search = "";
     if (!this.#identity) return;
+    this.#restoreStoredLocation();
     this.#refreshLocation();
     url.searchParams.set("public_key", this.#identity.publicKey);
     url.searchParams.set("employee_id", this.#identity.employeeId);
@@ -196,6 +209,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
       || socket.readyState !== 1
       || !this.#identity
     ) return;
+    this.#restoreStoredLocation();
     this.#refreshLocation();
     socket.send(JSON.stringify({
       type: "heartbeat",
@@ -203,6 +217,29 @@ export class WebSocketPresenceTransport implements PresenceTransport {
       device_id: this.#identity.deviceId,
       ...(this.#location ?? {}),
     }));
+  }
+
+  #restoreStoredLocation(): void {
+    if (!this.#locationStorage) return;
+    try {
+      const storedLatitude = this.#locationStorage.getItem("geo_lat");
+      const storedLongitude = this.#locationStorage.getItem("geo_lng");
+      if (storedLatitude === null || storedLongitude === null) return;
+      const latitude = Number(storedLatitude);
+      const longitude = Number(storedLongitude);
+      if (
+        Number.isFinite(latitude)
+        && Number.isFinite(longitude)
+        && latitude >= -90
+        && latitude <= 90
+        && longitude >= -180
+        && longitude <= 180
+      ) {
+        this.#location = { latitude, longitude };
+      }
+    } catch {
+      // Storage access is optional and may be blocked by browser policy.
+    }
   }
 
   #refreshLocation(): void {

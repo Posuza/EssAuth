@@ -17,6 +17,14 @@ function defaultGeolocation() {
         return null;
     }
 }
+function defaultLocationStorage() {
+    try {
+        return globalThis.localStorage ?? null;
+    }
+    catch {
+        return null;
+    }
+}
 export class WebSocketPresenceTransport {
     #apiUrl;
     #webSocketConstructor;
@@ -24,6 +32,7 @@ export class WebSocketPresenceTransport {
     #reconnectDelayMs;
     #lockManager;
     #geolocation;
+    #locationStorage;
     #active = false;
     #identity = null;
     #socket = null;
@@ -38,13 +47,14 @@ export class WebSocketPresenceTransport {
     #lastLocationRequestAt = 0;
     #locationRequestPending = false;
     #locationDisabled = false;
-    constructor(apiUrl, webSocketConstructor, heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS, reconnectDelayMs = RECONNECT_DELAY_MS, lockManager = defaultLockManager(), geolocation = defaultGeolocation()) {
+    constructor(apiUrl, webSocketConstructor, heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS, reconnectDelayMs = RECONNECT_DELAY_MS, lockManager = defaultLockManager(), geolocation = defaultGeolocation(), locationStorage = defaultLocationStorage()) {
         this.#apiUrl = apiUrl;
         this.#webSocketConstructor = webSocketConstructor;
         this.#heartbeatIntervalMs = heartbeatIntervalMs;
         this.#reconnectDelayMs = reconnectDelayMs;
         this.#lockManager = lockManager;
         this.#geolocation = geolocation;
+        this.#locationStorage = locationStorage;
     }
     connect(identity) {
         this.disconnect();
@@ -122,6 +132,7 @@ export class WebSocketPresenceTransport {
         url.search = "";
         if (!this.#identity)
             return;
+        this.#restoreStoredLocation();
         this.#refreshLocation();
         url.searchParams.set("public_key", this.#identity.publicKey);
         url.searchParams.set("employee_id", this.#identity.employeeId);
@@ -158,6 +169,7 @@ export class WebSocketPresenceTransport {
             || socket.readyState !== 1
             || !this.#identity)
             return;
+        this.#restoreStoredLocation();
         this.#refreshLocation();
         socket.send(JSON.stringify({
             type: "heartbeat",
@@ -165,6 +177,29 @@ export class WebSocketPresenceTransport {
             device_id: this.#identity.deviceId,
             ...(this.#location ?? {}),
         }));
+    }
+    #restoreStoredLocation() {
+        if (!this.#locationStorage)
+            return;
+        try {
+            const storedLatitude = this.#locationStorage.getItem("geo_lat");
+            const storedLongitude = this.#locationStorage.getItem("geo_lng");
+            if (storedLatitude === null || storedLongitude === null)
+                return;
+            const latitude = Number(storedLatitude);
+            const longitude = Number(storedLongitude);
+            if (Number.isFinite(latitude)
+                && Number.isFinite(longitude)
+                && latitude >= -90
+                && latitude <= 90
+                && longitude >= -180
+                && longitude <= 180) {
+                this.#location = { latitude, longitude };
+            }
+        }
+        catch {
+            // Storage access is optional and may be blocked by browser policy.
+        }
     }
     #refreshLocation() {
         if (!this.#active

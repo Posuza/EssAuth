@@ -1,5 +1,6 @@
 import type { PresenceIdentity, PresenceTransport } from "./presence-transport.js";
 type PresenceGeolocation = Pick<Geolocation, "getCurrentPosition">;
+type PresenceLocationStorage = Pick<Storage, "getItem">;
 type PresenceLockManager = {
     request(name: string, options: {
         signal: AbortSignal;
@@ -7,7 +8,7 @@ type PresenceLockManager = {
 };
 export declare class WebSocketPresenceTransport implements PresenceTransport {
     #private;
-    constructor(apiUrl: string, webSocketConstructor: typeof WebSocket | null, heartbeatIntervalMs?: number, reconnectDelayMs?: number, lockManager?: PresenceLockManager | null, geolocation?: PresenceGeolocation | null);
+    constructor(apiUrl: string, webSocketConstructor: typeof WebSocket | null, heartbeatIntervalMs?: number, reconnectDelayMs?: number, lockManager?: PresenceLockManager | null, geolocation?: PresenceGeolocation | null, locationStorage?: PresenceLocationStorage | null);
     connect(identity: PresenceIdentity): void;
     disconnect(): void;
 }

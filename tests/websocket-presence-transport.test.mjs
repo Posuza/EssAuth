@@ -140,6 +140,41 @@ test("presence heartbeat includes coordinates when browser location is available
   presence.disconnect();
 });
 
+test("presence heartbeat reuses coordinates already captured by the client app", () => {
+  FakeWebSocket.instances = [];
+  const locationStorage = {
+    getItem(key) {
+      return { geo_lat: "13.7563", geo_lng: "100.5018" }[key] ?? null;
+    },
+  };
+  const presence = new WebSocketPresenceTransport(
+    "https://ess.example.test/api/v1",
+    FakeWebSocket,
+    60_000,
+    60_000,
+    null,
+    null,
+    locationStorage,
+  );
+
+  presence.connect({
+    publicKey: "Tg2wbdIU3C0JRfSX",
+    employeeId: "680708",
+    deviceId: "device_test_1234",
+  });
+  const socket = FakeWebSocket.instances[0];
+  socket.open();
+
+  assert.deepEqual(JSON.parse(socket.sent[0]), {
+    type: "heartbeat",
+    employee_id: "680708",
+    device_id: "device_test_1234",
+    latitude: 13.7563,
+    longitude: 100.5018,
+  });
+  presence.disconnect();
+});
+
 test("tabs sharing one identity elect a single presence connection", async () => {
   FakeWebSocket.instances = [];
   const locks = new FakeLockManager();
