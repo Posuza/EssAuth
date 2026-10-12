@@ -98,7 +98,8 @@ while backend counting still deduplicates the logical clients.
 
 When presence monitoring is enabled, the presence-owning tab also requests
 browser location permission. If the user approves, heartbeats include the
-latest `latitude` and `longitude`, refreshed at most once every five minutes.
+latest live `latitude` and `longitude` from `watchPosition`. Location watching
+stops when monitoring is disabled, the tab is hidden, or the SDK disconnects.
 Location denial, timeout, or lack of browser support does not interrupt
 authentication or presence. ESS keeps only the latest coordinates in its live
 in-memory monitor; it does not write heartbeat locations to the database.

@@ -5,15 +5,13 @@ import type {
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const RECONNECT_DELAY_MS = 5_000;
-const LOCATION_REFRESH_MS = 5 * 60_000;
 
 type PresenceLocation = {
   latitude: number;
   longitude: number;
 };
 
-type PresenceGeolocation = Pick<Geolocation, "getCurrentPosition">;
-type PresenceLocationStorage = Pick<Storage, "getItem">;
+type PresenceGeolocation = Pick<Geolocation, "watchPosition" | "clearWatch">;
 
 type PresenceLockManager = {
   request(
@@ -39,14 +37,6 @@ function defaultGeolocation(): PresenceGeolocation | null {
   }
 }
 
-function defaultLocationStorage(): PresenceLocationStorage | null {
-  try {
-    return globalThis.localStorage ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export class WebSocketPresenceTransport implements PresenceTransport {
   readonly #apiUrl: string;
   readonly #webSocketConstructor: typeof WebSocket | null;
@@ -54,7 +44,6 @@ export class WebSocketPresenceTransport implements PresenceTransport {
   readonly #reconnectDelayMs: number;
   readonly #lockManager: PresenceLockManager | null;
   readonly #geolocation: PresenceGeolocation | null;
-  readonly #locationStorage: PresenceLocationStorage | null;
 
   #active = false;
   #identity: PresenceIdentity | null = null;
@@ -67,8 +56,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
   #paused = false;
   #visibilityListener: (() => void) | null = null;
   #location: PresenceLocation | null = null;
-  #lastLocationRequestAt = 0;
-  #locationRequestPending = false;
+  #locationWatchId: number | null = null;
   #locationDisabled = false;
 
   constructor(
@@ -78,7 +66,6 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     reconnectDelayMs = RECONNECT_DELAY_MS,
     lockManager: PresenceLockManager | null = defaultLockManager(),
     geolocation: PresenceGeolocation | null = defaultGeolocation(),
-    locationStorage: PresenceLocationStorage | null = defaultLocationStorage(),
   ) {
     this.#apiUrl = apiUrl;
     this.#webSocketConstructor = webSocketConstructor;
@@ -86,7 +73,6 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     this.#reconnectDelayMs = reconnectDelayMs;
     this.#lockManager = lockManager;
     this.#geolocation = geolocation;
-    this.#locationStorage = locationStorage;
   }
 
   connect(identity: PresenceIdentity): void {
@@ -109,6 +95,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     this.#lockAbortController?.abort();
     this.#lockAbortController = null;
     this.#clearHeartbeatTimer();
+    this.#stopLocationWatch();
     if (this.#reconnectTimer !== null) {
       clearTimeout(this.#reconnectTimer);
       this.#reconnectTimer = null;
@@ -118,8 +105,6 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     this.#socket = null;
     this.#identity = null;
     this.#location = null;
-    this.#lastLocationRequestAt = 0;
-    this.#locationRequestPending = false;
     this.#locationDisabled = false;
     if (socket && socket.readyState < 2) socket.close(1000, "Client stopped");
   }
@@ -169,8 +154,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     url.pathname = `${url.pathname.replace(/\/+$/, "")}/client-auth/presence/ws`;
     url.search = "";
     if (!this.#identity) return;
-    this.#restoreStoredLocation();
-    this.#refreshLocation();
+    this.#startLocationWatch();
     url.searchParams.set("public_key", this.#identity.publicKey);
     url.searchParams.set("employee_id", this.#identity.employeeId);
     url.searchParams.set("device_id", this.#identity.deviceId);
@@ -191,6 +175,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     socket.onclose = (event) => {
       if (this.#socket === socket) this.#socket = null;
       this.#clearHeartbeatTimer();
+      this.#stopLocationWatch();
       if (!this.#active) return;
       if (event.code === 1003 || event.code === 1008) {
         this.#active = false;
@@ -209,8 +194,6 @@ export class WebSocketPresenceTransport implements PresenceTransport {
       || socket.readyState !== 1
       || !this.#identity
     ) return;
-    this.#restoreStoredLocation();
-    this.#refreshLocation();
     socket.send(JSON.stringify({
       type: "heartbeat",
       employee_id: this.#identity.employeeId,
@@ -219,43 +202,15 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     }));
   }
 
-  #restoreStoredLocation(): void {
-    if (!this.#locationStorage) return;
-    try {
-      const storedLatitude = this.#locationStorage.getItem("geo_lat");
-      const storedLongitude = this.#locationStorage.getItem("geo_lng");
-      if (storedLatitude === null || storedLongitude === null) return;
-      const latitude = Number(storedLatitude);
-      const longitude = Number(storedLongitude);
-      if (
-        Number.isFinite(latitude)
-        && Number.isFinite(longitude)
-        && latitude >= -90
-        && latitude <= 90
-        && longitude >= -180
-        && longitude <= 180
-      ) {
-        this.#location = { latitude, longitude };
-      }
-    } catch {
-      // Storage access is optional and may be blocked by browser policy.
-    }
-  }
-
-  #refreshLocation(): void {
+  #startLocationWatch(): void {
     if (
       !this.#active
       || !this.#geolocation
-      || this.#locationRequestPending
+      || this.#locationWatchId !== null
       || this.#locationDisabled
     ) return;
-    const now = Date.now();
-    if (this.#lastLocationRequestAt && now - this.#lastLocationRequestAt < LOCATION_REFRESH_MS) return;
-    this.#lastLocationRequestAt = now;
-    this.#locationRequestPending = true;
-    this.#geolocation.getCurrentPosition(
+    this.#locationWatchId = this.#geolocation.watchPosition(
       (position) => {
-        this.#locationRequestPending = false;
         if (!this.#active) return;
         this.#location = {
           latitude: position.coords.latitude,
@@ -265,15 +220,23 @@ export class WebSocketPresenceTransport implements PresenceTransport {
         if (socket?.readyState === 1) this.#sendHeartbeat(socket);
       },
       (error) => {
-        this.#locationRequestPending = false;
-        if (error.code === 1) this.#locationDisabled = true;
+        if (error.code === 1) {
+          this.#locationDisabled = true;
+          this.#stopLocationWatch();
+        }
       },
       {
         enableHighAccuracy: false,
-        maximumAge: LOCATION_REFRESH_MS,
+        maximumAge: 15_000,
         timeout: 10_000,
       },
     );
+  }
+
+  #stopLocationWatch(): void {
+    if (this.#locationWatchId === null || !this.#geolocation) return;
+    this.#geolocation.clearWatch(this.#locationWatchId);
+    this.#locationWatchId = null;
   }
 
   #clearHeartbeatTimer(): void {
@@ -292,6 +255,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
       this.#paused = hidden;
       if (hidden) {
         this.#clearHeartbeatTimer();
+        this.#stopLocationWatch();
         const socket = this.#socket;
         this.#socket = null;
         if (socket && socket.readyState < 2) socket.close(1000, "Page hidden");

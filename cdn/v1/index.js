@@ -416,7 +416,6 @@ var FetchTransport = class {
 // src/internal/transport/websocket-presence-transport.ts
 var HEARTBEAT_INTERVAL_MS = 15e3;
 var RECONNECT_DELAY_MS = 5e3;
-var LOCATION_REFRESH_MS = 5 * 6e4;
 function defaultLockManager() {
   try {
     return globalThis.navigator?.locks ?? null;
@@ -431,13 +430,6 @@ function defaultGeolocation() {
     return null;
   }
 }
-function defaultLocationStorage() {
-  try {
-    return globalThis.localStorage ?? null;
-  } catch {
-    return null;
-  }
-}
 var WebSocketPresenceTransport = class {
   #apiUrl;
   #webSocketConstructor;
@@ -445,7 +437,6 @@ var WebSocketPresenceTransport = class {
   #reconnectDelayMs;
   #lockManager;
   #geolocation;
-  #locationStorage;
   #active = false;
   #identity = null;
   #socket = null;
@@ -457,17 +448,15 @@ var WebSocketPresenceTransport = class {
   #paused = false;
   #visibilityListener = null;
   #location = null;
-  #lastLocationRequestAt = 0;
-  #locationRequestPending = false;
+  #locationWatchId = null;
   #locationDisabled = false;
-  constructor(apiUrl, webSocketConstructor, heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS, reconnectDelayMs = RECONNECT_DELAY_MS, lockManager = defaultLockManager(), geolocation = defaultGeolocation(), locationStorage = defaultLocationStorage()) {
+  constructor(apiUrl, webSocketConstructor, heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS, reconnectDelayMs = RECONNECT_DELAY_MS, lockManager = defaultLockManager(), geolocation = defaultGeolocation()) {
     this.#apiUrl = apiUrl;
     this.#webSocketConstructor = webSocketConstructor;
     this.#heartbeatIntervalMs = heartbeatIntervalMs;
     this.#reconnectDelayMs = reconnectDelayMs;
     this.#lockManager = lockManager;
     this.#geolocation = geolocation;
-    this.#locationStorage = locationStorage;
   }
   connect(identity) {
     this.disconnect();
@@ -487,6 +476,7 @@ var WebSocketPresenceTransport = class {
     this.#lockAbortController?.abort();
     this.#lockAbortController = null;
     this.#clearHeartbeatTimer();
+    this.#stopLocationWatch();
     if (this.#reconnectTimer !== null) {
       clearTimeout(this.#reconnectTimer);
       this.#reconnectTimer = null;
@@ -495,8 +485,6 @@ var WebSocketPresenceTransport = class {
     this.#socket = null;
     this.#identity = null;
     this.#location = null;
-    this.#lastLocationRequestAt = 0;
-    this.#locationRequestPending = false;
     this.#locationDisabled = false;
     if (socket && socket.readyState < 2) socket.close(1e3, "Client stopped");
   }
@@ -540,8 +528,7 @@ var WebSocketPresenceTransport = class {
     url.pathname = `${url.pathname.replace(/\/+$/, "")}/client-auth/presence/ws`;
     url.search = "";
     if (!this.#identity) return;
-    this.#restoreStoredLocation();
-    this.#refreshLocation();
+    this.#startLocationWatch();
     url.searchParams.set("public_key", this.#identity.publicKey);
     url.searchParams.set("employee_id", this.#identity.employeeId);
     url.searchParams.set("device_id", this.#identity.deviceId);
@@ -560,6 +547,7 @@ var WebSocketPresenceTransport = class {
     socket.onclose = (event) => {
       if (this.#socket === socket) this.#socket = null;
       this.#clearHeartbeatTimer();
+      this.#stopLocationWatch();
       if (!this.#active) return;
       if (event.code === 1003 || event.code === 1008) {
         this.#active = false;
@@ -573,8 +561,6 @@ var WebSocketPresenceTransport = class {
   }
   #sendHeartbeat(socket) {
     if (this.#socket !== socket || socket.readyState !== 1 || !this.#identity) return;
-    this.#restoreStoredLocation();
-    this.#refreshLocation();
     socket.send(JSON.stringify({
       type: "heartbeat",
       employee_id: this.#identity.employeeId,
@@ -582,29 +568,10 @@ var WebSocketPresenceTransport = class {
       ...this.#location ?? {}
     }));
   }
-  #restoreStoredLocation() {
-    if (!this.#locationStorage) return;
-    try {
-      const storedLatitude = this.#locationStorage.getItem("geo_lat");
-      const storedLongitude = this.#locationStorage.getItem("geo_lng");
-      if (storedLatitude === null || storedLongitude === null) return;
-      const latitude = Number(storedLatitude);
-      const longitude = Number(storedLongitude);
-      if (Number.isFinite(latitude) && Number.isFinite(longitude) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) {
-        this.#location = { latitude, longitude };
-      }
-    } catch {
-    }
-  }
-  #refreshLocation() {
-    if (!this.#active || !this.#geolocation || this.#locationRequestPending || this.#locationDisabled) return;
-    const now = Date.now();
-    if (this.#lastLocationRequestAt && now - this.#lastLocationRequestAt < LOCATION_REFRESH_MS) return;
-    this.#lastLocationRequestAt = now;
-    this.#locationRequestPending = true;
-    this.#geolocation.getCurrentPosition(
+  #startLocationWatch() {
+    if (!this.#active || !this.#geolocation || this.#locationWatchId !== null || this.#locationDisabled) return;
+    this.#locationWatchId = this.#geolocation.watchPosition(
       (position) => {
-        this.#locationRequestPending = false;
         if (!this.#active) return;
         this.#location = {
           latitude: position.coords.latitude,
@@ -614,15 +581,22 @@ var WebSocketPresenceTransport = class {
         if (socket?.readyState === 1) this.#sendHeartbeat(socket);
       },
       (error) => {
-        this.#locationRequestPending = false;
-        if (error.code === 1) this.#locationDisabled = true;
+        if (error.code === 1) {
+          this.#locationDisabled = true;
+          this.#stopLocationWatch();
+        }
       },
       {
         enableHighAccuracy: false,
-        maximumAge: LOCATION_REFRESH_MS,
+        maximumAge: 15e3,
         timeout: 1e4
       }
     );
+  }
+  #stopLocationWatch() {
+    if (this.#locationWatchId === null || !this.#geolocation) return;
+    this.#geolocation.clearWatch(this.#locationWatchId);
+    this.#locationWatchId = null;
   }
   #clearHeartbeatTimer() {
     if (this.#heartbeatTimer === null) return;
@@ -639,6 +613,7 @@ var WebSocketPresenceTransport = class {
       this.#paused = hidden;
       if (hidden) {
         this.#clearHeartbeatTimer();
+        this.#stopLocationWatch();
         const socket = this.#socket;
         this.#socket = null;
         if (socket && socket.readyState < 2) socket.close(1e3, "Page hidden");
