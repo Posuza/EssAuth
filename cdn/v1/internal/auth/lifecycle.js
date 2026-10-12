@@ -3,11 +3,6 @@ import { CallbackService } from "./callback-service.js";
 import { browserUrl, callbackError, callbackTicket, cleanCallbackUrl, } from "./redirect.js";
 import { EssAuthError } from "../core/errors.js";
 import { TicketService } from "./ticket-service.js";
-function isServiceUnavailable(error) {
-    return error instanceof EssAuthError
-        && (error.code === "NETWORK_ERROR"
-            || (error.status !== null && error.status >= 500 && error.status <= 599));
-}
 export async function initializeIdentity(identity, tickets, callbacks) {
     const url = browserUrl();
     const returnedError = callbackError(url);
@@ -15,19 +10,20 @@ export async function initializeIdentity(identity, tickets, callbacks) {
     const restoredEmployeeId = !ticket && !returnedError
         ? identity.restore()
         : null;
+    // An existing client session must not depend on ESS availability. New
+    // logins and callback tickets still pass through central validation below.
+    if (restoredEmployeeId) {
+        return {
+            employeeId: restoredEmployeeId,
+            error: null,
+            callbackValidated: true,
+        };
+    }
     try {
         await callbacks.validate(url.toString());
     }
     catch (error) {
         cleanCallbackUrl(url);
-        if (restoredEmployeeId
-            && isServiceUnavailable(error)) {
-            return {
-                employeeId: restoredEmployeeId,
-                error: null,
-                callbackValidated: false,
-            };
-        }
         return {
             employeeId: null,
             error: error instanceof Error ? error : new Error("ESS client validation failed."),

@@ -169,25 +169,22 @@ var TicketService = class {
 };
 
 // src/internal/auth/lifecycle.ts
-function isServiceUnavailable(error) {
-  return error instanceof EssAuthError && (error.code === "NETWORK_ERROR" || error.status !== null && error.status >= 500 && error.status <= 599);
-}
 async function initializeIdentity(identity, tickets, callbacks) {
   const url = browserUrl();
   const returnedError = callbackError(url);
   const ticket = callbackTicket(url);
   const restoredEmployeeId = !ticket && !returnedError ? identity.restore() : null;
+  if (restoredEmployeeId) {
+    return {
+      employeeId: restoredEmployeeId,
+      error: null,
+      callbackValidated: true
+    };
+  }
   try {
     await callbacks.validate(url.toString());
   } catch (error) {
     cleanCallbackUrl(url);
-    if (restoredEmployeeId && isServiceUnavailable(error)) {
-      return {
-        employeeId: restoredEmployeeId,
-        error: null,
-        callbackValidated: false
-      };
-    }
     return {
       employeeId: null,
       error: error instanceof Error ? error : new Error("ESS client validation failed."),

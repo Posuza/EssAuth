@@ -114,12 +114,12 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
 
   const restored = await EssAuth.init(options);
   assert.equal(restored.employeeId, "680708");
-  assert.equal(requests.length, 3);
+  assert.equal(requests.length, 2);
 
   await restored.logout();
   assert.equal(restored.employeeId, null);
   assert.equal(storage.values.size, 0);
-  assert.deepEqual(requests[3], {
+  assert.deepEqual(requests[2], {
     url: "https://api.example.test/api/v1/client-auth/logout",
     body: {
       public_key: "Ab3dE6gH9jKm2NpQ",
@@ -130,7 +130,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
 
   const loggedOut = await EssAuth.init(options);
   assert.equal(loggedOut.employeeId, null);
-  assert.equal(requests.length, 5);
+  assert.equal(requests.length, 4);
 
   loggedOut.login();
   const redirect = new URL(assignedUrl);
@@ -178,7 +178,7 @@ test("offline initialization restores identity and logout remains local-first", 
   assert.equal(storage.values.size, 0);
 });
 
-test("gateway outage restores an existing identity", async (context) => {
+test("restored identity does not contact ESS", async (context) => {
   const originalLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
   const originalHistory = Object.getOwnPropertyDescriptor(globalThis, "history");
   context.after(() => {
@@ -206,10 +206,9 @@ test("gateway outage restores an existing identity", async (context) => {
   const auth = await EssAuth.init({
     publicKey,
     storage,
-    fetch: async () => new Response(JSON.stringify({ detail: "Service unavailable" }), {
-      status: 503,
-      headers: { "content-type": "application/json" },
-    }),
+    fetch: async () => {
+      throw new Error("ESS must not be called for a restored identity");
+    },
   });
 
   assert.equal(auth.employeeId, "680708");

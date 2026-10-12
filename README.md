@@ -149,17 +149,18 @@ Call this once whenever the page loads. It automatically:
 - stores the verified employee ID in `sessionStorage`; and
 - restores that employee ID on later page loads.
 
-Presence starts only when an employee identity has been verified or restored
-while ESS is reachable. It uses a device ID shared through `localStorage`.
+Presence starts when an employee identity has been verified or restored. It
+uses a device ID shared through `localStorage` and reconnects independently
+when ESS becomes reachable again.
 The backend groups by public application key, employee ID, and device ID, so
 multiple tabs are not mistaken for separate active clients while different
 applications on the same device remain separate.
 
-If ESS is temporarily unreachable during a later page load, an identity that
-was already verified and stored for this client is restored without blocking
-the client application. This includes direct network failures and temporary
-HTTP 5xx service or gateway failures. An explicit client rejection such as an
-invalid callback still fails closed, and a new login still requires ESS.
+On a later page load, an identity already verified and stored for this client
+is restored without making another ESS request. This keeps an existing client
+session independent from ESS outages and avoids browser CORS noise from an
+unavailable proxy. New logins and returned callback tickets still require ESS,
+and an explicit callback rejection still fails closed.
 
 If ESS rejects a callback address, it may return the browser to the registered
 application origin with `essauth_error`. `EssAuth.init()` removes that marker

@@ -10,12 +10,6 @@ import { EssAuthError } from "../core/errors.js";
 import { TicketService } from "./ticket-service.js";
 import type { AuthInitialization } from "../../public/types.js";
 
-function isServiceUnavailable(error: unknown): boolean {
-  return error instanceof EssAuthError
-    && (error.code === "NETWORK_ERROR"
-      || (error.status !== null && error.status >= 500 && error.status <= 599));
-}
-
 export async function initializeIdentity(
   identity: IdentityStore,
   tickets: TicketService,
@@ -28,20 +22,20 @@ export async function initializeIdentity(
     ? identity.restore()
     : null;
 
+  // An existing client session must not depend on ESS availability. New
+  // logins and callback tickets still pass through central validation below.
+  if (restoredEmployeeId) {
+    return {
+      employeeId: restoredEmployeeId,
+      error: null,
+      callbackValidated: true,
+    };
+  }
+
   try {
     await callbacks.validate(url.toString());
   } catch (error) {
     cleanCallbackUrl(url);
-    if (
-      restoredEmployeeId
-      && isServiceUnavailable(error)
-    ) {
-      return {
-        employeeId: restoredEmployeeId,
-        error: null,
-        callbackValidated: false,
-      };
-    }
     return {
       employeeId: null,
       error: error instanceof Error ? error : new Error("ESS client validation failed."),
