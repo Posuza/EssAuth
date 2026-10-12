@@ -3,6 +3,11 @@ import { CallbackService } from "./callback-service.js";
 import { browserUrl, callbackError, callbackTicket, cleanCallbackUrl, } from "./redirect.js";
 import { EssAuthError } from "../core/errors.js";
 import { TicketService } from "./ticket-service.js";
+function isServiceUnavailable(error) {
+    return error instanceof EssAuthError
+        && (error.code === "NETWORK_ERROR"
+            || (error.status !== null && error.status >= 500 && error.status <= 599));
+}
 export async function initializeIdentity(identity, tickets, callbacks) {
     const url = browserUrl();
     const returnedError = callbackError(url);
@@ -16,8 +21,7 @@ export async function initializeIdentity(identity, tickets, callbacks) {
     catch (error) {
         cleanCallbackUrl(url);
         if (restoredEmployeeId
-            && error instanceof EssAuthError
-            && error.code === "NETWORK_ERROR") {
+            && isServiceUnavailable(error)) {
             return {
                 employeeId: restoredEmployeeId,
                 error: null,

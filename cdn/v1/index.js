@@ -169,6 +169,9 @@ var TicketService = class {
 };
 
 // src/internal/auth/lifecycle.ts
+function isServiceUnavailable(error) {
+  return error instanceof EssAuthError && (error.code === "NETWORK_ERROR" || error.status !== null && error.status >= 500 && error.status <= 599);
+}
 async function initializeIdentity(identity, tickets, callbacks) {
   const url = browserUrl();
   const returnedError = callbackError(url);
@@ -178,7 +181,7 @@ async function initializeIdentity(identity, tickets, callbacks) {
     await callbacks.validate(url.toString());
   } catch (error) {
     cleanCallbackUrl(url);
-    if (restoredEmployeeId && error instanceof EssAuthError && error.code === "NETWORK_ERROR") {
+    if (restoredEmployeeId && isServiceUnavailable(error)) {
       return {
         employeeId: restoredEmployeeId,
         error: null,

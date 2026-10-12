@@ -10,6 +10,12 @@ import { EssAuthError } from "../core/errors.js";
 import { TicketService } from "./ticket-service.js";
 import type { AuthInitialization } from "../../public/types.js";
 
+function isServiceUnavailable(error: unknown): boolean {
+  return error instanceof EssAuthError
+    && (error.code === "NETWORK_ERROR"
+      || (error.status !== null && error.status >= 500 && error.status <= 599));
+}
+
 export async function initializeIdentity(
   identity: IdentityStore,
   tickets: TicketService,
@@ -28,8 +34,7 @@ export async function initializeIdentity(
     cleanCallbackUrl(url);
     if (
       restoredEmployeeId
-      && error instanceof EssAuthError
-      && error.code === "NETWORK_ERROR"
+      && isServiceUnavailable(error)
     ) {
       return {
         employeeId: restoredEmployeeId,

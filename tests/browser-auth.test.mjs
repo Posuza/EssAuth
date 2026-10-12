@@ -178,6 +178,44 @@ test("offline initialization restores identity and logout remains local-first", 
   assert.equal(storage.values.size, 0);
 });
 
+test("gateway outage restores an existing identity", async (context) => {
+  const originalLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
+  const originalHistory = Object.getOwnPropertyDescriptor(globalThis, "history");
+  context.after(() => {
+    if (originalLocation) Object.defineProperty(globalThis, "location", originalLocation);
+    else delete globalThis.location;
+    if (originalHistory) Object.defineProperty(globalThis, "history", originalHistory);
+    else delete globalThis.history;
+  });
+
+  Object.defineProperty(globalThis, "location", {
+    configurable: true,
+    value: { href: "https://client.example.test/payroll" },
+  });
+  Object.defineProperty(globalThis, "history", {
+    configurable: true,
+    value: { state: null, replaceState() {} },
+  });
+
+  const publicKey = "Ab3dE6gH9jKm2NpQ";
+  const storage = memoryStorage();
+  storage.setItem(
+    `ess-auth-o1.client-identity.v1.${publicKey}`,
+    JSON.stringify({ employeeId: "680708", publicKey }),
+  );
+  const auth = await EssAuth.init({
+    publicKey,
+    storage,
+    fetch: async () => new Response(JSON.stringify({ detail: "Service unavailable" }), {
+      status: 503,
+      headers: { "content-type": "application/json" },
+    }),
+  });
+
+  assert.equal(auth.employeeId, "680708");
+  assert.equal(auth.error, null);
+});
+
 test("callback rejection is returned as an SDK error without another login loop", async (context) => {
   const originalLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
   const originalHistory = Object.getOwnPropertyDescriptor(globalThis, "history");

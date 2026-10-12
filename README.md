@@ -157,9 +157,9 @@ applications on the same device remain separate.
 
 If ESS is temporarily unreachable during a later page load, an identity that
 was already verified and stored for this client is restored without blocking
-the client application. This offline fallback applies only to network failure;
-an explicit ESS rejection still fails closed, and a new login still requires
-ESS.
+the client application. This includes direct network failures and temporary
+HTTP 5xx service or gateway failures. An explicit client rejection such as an
+invalid callback still fails closed, and a new login still requires ESS.
 
 If ESS rejects a callback address, it may return the browser to the registered
 application origin with `essauth_error`. `EssAuth.init()` removes that marker
