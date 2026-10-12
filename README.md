@@ -75,11 +75,19 @@ HTML clients may keep the registered key in a data attribute:
   <button id="logout">Sign out</button>
 
   <script type="module">
-    import EssAuth from "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@1/cdn/v1/index.js";
+    // The time bucket refreshes the floating v1 release at most once every
+    // five minutes without requiring a client deployment for each SDK update.
+    const sdkVersionBucket = Math.floor(Date.now() / 300_000);
+    const sdkUrl =
+      `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@release-v1/cdn/v1/index.js?v=${sdkVersionBucket}`;
+    const { default: EssAuth } = await import(sdkUrl);
 
     const auth = await EssAuth.init({
       publicKey: document.body.dataset.publicKey,
     });
+
+    if (!auth.employeeId && !auth.error) auth.login();
+    if (auth.error) console.error(auth.error.message);
 
     document.querySelector("#login").onclick = () => auth.login();
     document.querySelector("#logout").onclick = () => auth.logout();
@@ -103,8 +111,9 @@ component or route:
 
 ```js
 // src/ess-auth.js
+const sdkVersionBucket = Math.floor(Date.now() / 300_000);
 const SDK_URL =
-  "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@1/cdn/v1/index.js";
+  `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@release-v1/cdn/v1/index.js?v=${sdkVersionBucket}`;
 
 let authPromise;
 
@@ -131,12 +140,39 @@ on every route reload:
 const auth = await getEssAuth();
 
 if (auth.error) console.error(auth.error.message);
-if (auth.employeeId) console.log(auth.employeeId);
+else if (auth.employeeId) console.log(auth.employeeId);
+else auth.login();
 ```
 
 Components call `loginWithEss()` and `logoutFromEss()` from the shared module.
-React routing on the same origin keeps the SDK identity available in the same
-browser tab.
+The client does not parse callback tickets, persist the employee ID, create a
+presence WebSocket, or construct an ESS logout request. The SDK owns those
+steps. A full page reload is required before an already-open page can execute a
+newly published SDK; restarting the client development server is not required.
+
+The five-minute query bucket is recommended for clients that follow the
+floating `release-v1` channel. It avoids indefinitely reusing a browser-cached
+bundle while still allowing ordinary CDN caching. Clients that require a
+reviewed, reproducible dependency should instead pin an immutable release such
+as `@v1.2.0` and update that URL as part of their own deployment process.
+
+## Client login flow
+
+Every browser client follows the same integration flow, regardless of whether
+it uses plain HTML, React, Vue, or another frontend framework:
+
+1. Import the SDK once and call `EssAuth.init({ publicKey })` during application
+   startup.
+2. When `auth.employeeId` is present, load the application's employee profile
+   and render its authenticated UI.
+3. When `auth.error` is present, show a retry or unavailable state. Do not start
+   another redirect automatically.
+4. When both values are absent, call `auth.login()` to redirect to ESS. ESS
+   returns to the same client URL, and the next `EssAuth.init()` verifies and
+   removes the one-time ticket.
+5. Call `await auth.logout()` before clearing the application's own UI state.
+   The SDK removes its stored identity first and treats ESS notification as
+   best effort.
 
 ### `EssAuth.init(options)`
 
