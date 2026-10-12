@@ -5,6 +5,14 @@ import type {
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const RECONNECT_DELAY_MS = 5_000;
+const LOCATION_REFRESH_MS = 5 * 60_000;
+
+type PresenceLocation = {
+  latitude: number;
+  longitude: number;
+};
+
+type PresenceGeolocation = Pick<Geolocation, "getCurrentPosition">;
 
 type PresenceLockManager = {
   request(
@@ -22,12 +30,21 @@ function defaultLockManager(): PresenceLockManager | null {
   }
 }
 
+function defaultGeolocation(): PresenceGeolocation | null {
+  try {
+    return globalThis.navigator?.geolocation ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export class WebSocketPresenceTransport implements PresenceTransport {
   readonly #apiUrl: string;
   readonly #webSocketConstructor: typeof WebSocket | null;
   readonly #heartbeatIntervalMs: number;
   readonly #reconnectDelayMs: number;
   readonly #lockManager: PresenceLockManager | null;
+  readonly #geolocation: PresenceGeolocation | null;
 
   #active = false;
   #identity: PresenceIdentity | null = null;
@@ -37,6 +54,12 @@ export class WebSocketPresenceTransport implements PresenceTransport {
   #lockAbortController: AbortController | null = null;
   #releaseLock: (() => void) | null = null;
   #generation = 0;
+  #paused = false;
+  #visibilityListener: (() => void) | null = null;
+  #location: PresenceLocation | null = null;
+  #lastLocationRequestAt = 0;
+  #locationRequestPending = false;
+  #locationDisabled = false;
 
   constructor(
     apiUrl: string,
@@ -44,12 +67,14 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS,
     reconnectDelayMs = RECONNECT_DELAY_MS,
     lockManager: PresenceLockManager | null = defaultLockManager(),
+    geolocation: PresenceGeolocation | null = defaultGeolocation(),
   ) {
     this.#apiUrl = apiUrl;
     this.#webSocketConstructor = webSocketConstructor;
     this.#heartbeatIntervalMs = heartbeatIntervalMs;
     this.#reconnectDelayMs = reconnectDelayMs;
     this.#lockManager = lockManager;
+    this.#geolocation = geolocation;
   }
 
   connect(identity: PresenceIdentity): void {
@@ -58,11 +83,14 @@ export class WebSocketPresenceTransport implements PresenceTransport {
 
     this.#active = true;
     this.#identity = identity;
+    this.#watchVisibility();
     this.#startPresenceOwner();
   }
 
   disconnect(): void {
     this.#active = false;
+    this.#paused = false;
+    this.#unwatchVisibility();
     this.#generation++;
     this.#releaseLock?.();
     this.#releaseLock = null;
@@ -77,6 +105,10 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     const socket = this.#socket;
     this.#socket = null;
     this.#identity = null;
+    this.#location = null;
+    this.#lastLocationRequestAt = 0;
+    this.#locationRequestPending = false;
+    this.#locationDisabled = false;
     if (socket && socket.readyState < 2) socket.close(1000, "Client stopped");
   }
 
@@ -117,13 +149,15 @@ export class WebSocketPresenceTransport implements PresenceTransport {
   }
 
   #openSocket(): void {
-    if (!this.#active || !this.#webSocketConstructor) return;
+    if (!this.#active || this.#paused || !this.#webSocketConstructor) return;
+    if (this.#socket && this.#socket.readyState < 2) return;
 
     const url = new URL(this.#apiUrl);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.pathname = `${url.pathname.replace(/\/+$/, "")}/client-auth/presence/ws`;
     url.search = "";
     if (!this.#identity) return;
+    this.#refreshLocation();
     url.searchParams.set("public_key", this.#identity.publicKey);
     url.searchParams.set("employee_id", this.#identity.employeeId);
     url.searchParams.set("device_id", this.#identity.deviceId);
@@ -162,16 +196,80 @@ export class WebSocketPresenceTransport implements PresenceTransport {
       || socket.readyState !== 1
       || !this.#identity
     ) return;
+    this.#refreshLocation();
     socket.send(JSON.stringify({
       type: "heartbeat",
       employee_id: this.#identity.employeeId,
       device_id: this.#identity.deviceId,
+      ...(this.#location ?? {}),
     }));
+  }
+
+  #refreshLocation(): void {
+    if (
+      !this.#active
+      || !this.#geolocation
+      || this.#locationRequestPending
+      || this.#locationDisabled
+    ) return;
+    const now = Date.now();
+    if (this.#lastLocationRequestAt && now - this.#lastLocationRequestAt < LOCATION_REFRESH_MS) return;
+    this.#lastLocationRequestAt = now;
+    this.#locationRequestPending = true;
+    this.#geolocation.getCurrentPosition(
+      (position) => {
+        this.#locationRequestPending = false;
+        if (!this.#active) return;
+        this.#location = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+        const socket = this.#socket;
+        if (socket?.readyState === 1) this.#sendHeartbeat(socket);
+      },
+      (error) => {
+        this.#locationRequestPending = false;
+        if (error.code === 1) this.#locationDisabled = true;
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: LOCATION_REFRESH_MS,
+        timeout: 10_000,
+      },
+    );
   }
 
   #clearHeartbeatTimer(): void {
     if (this.#heartbeatTimer === null) return;
     clearInterval(this.#heartbeatTimer);
     this.#heartbeatTimer = null;
+  }
+
+  #watchVisibility(): void {
+    const documentRef = globalThis.document;
+    if (!documentRef?.addEventListener || this.#visibilityListener) return;
+    this.#paused = documentRef.visibilityState === "hidden";
+    this.#visibilityListener = () => {
+      const hidden = documentRef.visibilityState === "hidden";
+      if (hidden === this.#paused) return;
+      this.#paused = hidden;
+      if (hidden) {
+        this.#clearHeartbeatTimer();
+        const socket = this.#socket;
+        this.#socket = null;
+        if (socket && socket.readyState < 2) socket.close(1000, "Page hidden");
+        return;
+      }
+      this.#openSocket();
+    };
+    documentRef.addEventListener("visibilitychange", this.#visibilityListener);
+  }
+
+  #unwatchVisibility(): void {
+    const documentRef = globalThis.document;
+    if (this.#visibilityListener && documentRef?.removeEventListener) {
+      documentRef.removeEventListener("visibilitychange", this.#visibilityListener);
+    }
+    this.#visibilityListener = null;
   }
 }

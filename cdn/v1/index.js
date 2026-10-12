@@ -416,9 +416,17 @@ var FetchTransport = class {
 // src/internal/transport/websocket-presence-transport.ts
 var HEARTBEAT_INTERVAL_MS = 15e3;
 var RECONNECT_DELAY_MS = 5e3;
+var LOCATION_REFRESH_MS = 5 * 6e4;
 function defaultLockManager() {
   try {
     return globalThis.navigator?.locks ?? null;
+  } catch {
+    return null;
+  }
+}
+function defaultGeolocation() {
+  try {
+    return globalThis.navigator?.geolocation ?? null;
   } catch {
     return null;
   }
@@ -429,6 +437,7 @@ var WebSocketPresenceTransport = class {
   #heartbeatIntervalMs;
   #reconnectDelayMs;
   #lockManager;
+  #geolocation;
   #active = false;
   #identity = null;
   #socket = null;
@@ -437,22 +446,32 @@ var WebSocketPresenceTransport = class {
   #lockAbortController = null;
   #releaseLock = null;
   #generation = 0;
-  constructor(apiUrl, webSocketConstructor, heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS, reconnectDelayMs = RECONNECT_DELAY_MS, lockManager = defaultLockManager()) {
+  #paused = false;
+  #visibilityListener = null;
+  #location = null;
+  #lastLocationRequestAt = 0;
+  #locationRequestPending = false;
+  #locationDisabled = false;
+  constructor(apiUrl, webSocketConstructor, heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS, reconnectDelayMs = RECONNECT_DELAY_MS, lockManager = defaultLockManager(), geolocation = defaultGeolocation()) {
     this.#apiUrl = apiUrl;
     this.#webSocketConstructor = webSocketConstructor;
     this.#heartbeatIntervalMs = heartbeatIntervalMs;
     this.#reconnectDelayMs = reconnectDelayMs;
     this.#lockManager = lockManager;
+    this.#geolocation = geolocation;
   }
   connect(identity) {
     this.disconnect();
     if (!this.#webSocketConstructor) return;
     this.#active = true;
     this.#identity = identity;
+    this.#watchVisibility();
     this.#startPresenceOwner();
   }
   disconnect() {
     this.#active = false;
+    this.#paused = false;
+    this.#unwatchVisibility();
     this.#generation++;
     this.#releaseLock?.();
     this.#releaseLock = null;
@@ -466,6 +485,10 @@ var WebSocketPresenceTransport = class {
     const socket = this.#socket;
     this.#socket = null;
     this.#identity = null;
+    this.#location = null;
+    this.#lastLocationRequestAt = 0;
+    this.#locationRequestPending = false;
+    this.#locationDisabled = false;
     if (socket && socket.readyState < 2) socket.close(1e3, "Client stopped");
   }
   #startPresenceOwner() {
@@ -501,12 +524,14 @@ var WebSocketPresenceTransport = class {
     });
   }
   #openSocket() {
-    if (!this.#active || !this.#webSocketConstructor) return;
+    if (!this.#active || this.#paused || !this.#webSocketConstructor) return;
+    if (this.#socket && this.#socket.readyState < 2) return;
     const url = new URL(this.#apiUrl);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.pathname = `${url.pathname.replace(/\/+$/, "")}/client-auth/presence/ws`;
     url.search = "";
     if (!this.#identity) return;
+    this.#refreshLocation();
     url.searchParams.set("public_key", this.#identity.publicKey);
     url.searchParams.set("employee_id", this.#identity.employeeId);
     url.searchParams.set("device_id", this.#identity.deviceId);
@@ -538,20 +563,77 @@ var WebSocketPresenceTransport = class {
   }
   #sendHeartbeat(socket) {
     if (this.#socket !== socket || socket.readyState !== 1 || !this.#identity) return;
+    this.#refreshLocation();
     socket.send(JSON.stringify({
       type: "heartbeat",
       employee_id: this.#identity.employeeId,
-      device_id: this.#identity.deviceId
+      device_id: this.#identity.deviceId,
+      ...this.#location ?? {}
     }));
+  }
+  #refreshLocation() {
+    if (!this.#active || !this.#geolocation || this.#locationRequestPending || this.#locationDisabled) return;
+    const now = Date.now();
+    if (this.#lastLocationRequestAt && now - this.#lastLocationRequestAt < LOCATION_REFRESH_MS) return;
+    this.#lastLocationRequestAt = now;
+    this.#locationRequestPending = true;
+    this.#geolocation.getCurrentPosition(
+      (position) => {
+        this.#locationRequestPending = false;
+        if (!this.#active) return;
+        this.#location = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        };
+        const socket = this.#socket;
+        if (socket?.readyState === 1) this.#sendHeartbeat(socket);
+      },
+      (error) => {
+        this.#locationRequestPending = false;
+        if (error.code === 1) this.#locationDisabled = true;
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: LOCATION_REFRESH_MS,
+        timeout: 1e4
+      }
+    );
   }
   #clearHeartbeatTimer() {
     if (this.#heartbeatTimer === null) return;
     clearInterval(this.#heartbeatTimer);
     this.#heartbeatTimer = null;
   }
+  #watchVisibility() {
+    const documentRef = globalThis.document;
+    if (!documentRef?.addEventListener || this.#visibilityListener) return;
+    this.#paused = documentRef.visibilityState === "hidden";
+    this.#visibilityListener = () => {
+      const hidden = documentRef.visibilityState === "hidden";
+      if (hidden === this.#paused) return;
+      this.#paused = hidden;
+      if (hidden) {
+        this.#clearHeartbeatTimer();
+        const socket = this.#socket;
+        this.#socket = null;
+        if (socket && socket.readyState < 2) socket.close(1e3, "Page hidden");
+        return;
+      }
+      this.#openSocket();
+    };
+    documentRef.addEventListener("visibilitychange", this.#visibilityListener);
+  }
+  #unwatchVisibility() {
+    const documentRef = globalThis.document;
+    if (this.#visibilityListener && documentRef?.removeEventListener) {
+      documentRef.removeEventListener("visibilitychange", this.#visibilityListener);
+    }
+    this.#visibilityListener = null;
+  }
 };
 
 // src/public/ess-auth.ts
+var PRESENCE_SETTINGS_REFRESH_MS = 6e4;
 var EssAuth = class _EssAuth {
   employeeId = null;
   error = null;
@@ -561,12 +643,19 @@ var EssAuth = class _EssAuth {
   #tickets;
   #callbacks;
   #presence;
+  #apiUrl;
+  #fetcher;
   #callbackValidated = false;
   #unsubscribeIdentity = null;
+  #presenceIdentity = null;
+  #presenceEnabled = null;
+  #presenceSettingsTimer = null;
   constructor(options) {
     const config = resolveConfig(options);
     this.#publicKey = config.publicKey;
     this.#loginUrl = config.loginUrl;
+    this.#apiUrl = config.apiUrl;
+    this.#fetcher = config.fetcher;
     this.#identity = new IdentityStore(
       config.storage,
       config.storageKey,
@@ -591,9 +680,7 @@ var EssAuth = class _EssAuth {
     auth.error = result.error;
     auth.#callbackValidated = result.callbackValidated;
     if (result.callbackValidated && result.employeeId) {
-      auth.#presence.connect(
-        createPresenceIdentity(auth.#publicKey, result.employeeId)
-      );
+      auth.#startPresenceMonitoring(result.employeeId);
       auth.#unsubscribeIdentity = auth.#identity.onRemoved(
         result.employeeId,
         () => auth.#handleRemoteLogout()
@@ -610,13 +697,13 @@ var EssAuth = class _EssAuth {
       this.error = error;
       throw error;
     }
-    this.#presence.disconnect();
+    this.#stopPresenceMonitoring();
     this.#clearIdentity();
     redirectToLogin(this.#loginUrl, this.#publicKey);
   }
   async logout() {
     const employeeId = this.employeeId;
-    this.#presence.disconnect();
+    this.#stopPresenceMonitoring();
     this.#clearIdentity();
     if (!employeeId) return;
     try {
@@ -634,11 +721,48 @@ var EssAuth = class _EssAuth {
   #handleRemoteLogout() {
     this.#unsubscribeIdentity?.();
     this.#unsubscribeIdentity = null;
-    this.#presence.disconnect();
+    this.#stopPresenceMonitoring();
     this.employeeId = null;
     this.error = null;
     if (typeof globalThis.location?.reload === "function") {
       globalThis.location.reload();
+    }
+  }
+  #startPresenceMonitoring(employeeId) {
+    this.#presenceIdentity = createPresenceIdentity(this.#publicKey, employeeId);
+    void this.#syncPresenceMonitoring();
+    this.#presenceSettingsTimer = setInterval(
+      () => void this.#syncPresenceMonitoring(),
+      PRESENCE_SETTINGS_REFRESH_MS
+    );
+  }
+  #stopPresenceMonitoring() {
+    if (this.#presenceSettingsTimer !== null) {
+      clearInterval(this.#presenceSettingsTimer);
+      this.#presenceSettingsTimer = null;
+    }
+    this.#presenceIdentity = null;
+    this.#presenceEnabled = null;
+    this.#presence.disconnect();
+  }
+  async #syncPresenceMonitoring() {
+    if (!this.#presenceIdentity) return;
+    let enabled = false;
+    try {
+      const response = await this.#fetcher(
+        `${this.#apiUrl}/client-auth/presence/settings`,
+        { method: "GET", cache: "no-store" }
+      );
+      const settings = await response.json();
+      enabled = response.ok && settings.enabled === true;
+    } catch {
+    }
+    if (enabled === this.#presenceEnabled) return;
+    this.#presenceEnabled = enabled;
+    if (enabled) {
+      this.#presence.connect(this.#presenceIdentity);
+    } else {
+      this.#presence.disconnect();
     }
   }
 };

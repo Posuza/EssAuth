@@ -9,7 +9,8 @@ package root and use `EssAuth.init()`, `auth.login()`, and `auth.logout()`.
 - `storage/` owns coordinated local/tab persistence, migration, and identities
   scoped by application and employee.
 - `transport/` defines separate request and presence contracts. Fetch handles
-  request/response calls; WebSocket handles test client-presence heartbeats.
+  request/response calls; WebSocket handles client-presence heartbeats and
+  optional, permission-gated browser coordinates.
 
 Future telemetry should be added as its own feature folder and coordinated by
 `auth/lifecycle.ts`. Current presence heartbeats identify only the registered

@@ -8,6 +8,7 @@ import { IdentityStore } from "../internal/storage/identity-store.js";
 import { createPresenceIdentity } from "../internal/storage/presence-identity.js";
 import { FetchTransport } from "../internal/transport/fetch-transport.js";
 import { WebSocketPresenceTransport } from "../internal/transport/websocket-presence-transport.js";
+const PRESENCE_SETTINGS_REFRESH_MS = 60_000;
 /** Public redirect-authentication facade for client applications. */
 export class EssAuth {
     employeeId = null;
@@ -18,12 +19,19 @@ export class EssAuth {
     #tickets;
     #callbacks;
     #presence;
+    #apiUrl;
+    #fetcher;
     #callbackValidated = false;
     #unsubscribeIdentity = null;
+    #presenceIdentity = null;
+    #presenceEnabled = null;
+    #presenceSettingsTimer = null;
     constructor(options) {
         const config = resolveConfig(options);
         this.#publicKey = config.publicKey;
         this.#loginUrl = config.loginUrl;
+        this.#apiUrl = config.apiUrl;
+        this.#fetcher = config.fetcher;
         this.#identity = new IdentityStore(config.storage, config.storageKey, config.publicKey);
         const transport = new FetchTransport(config.apiUrl, config.fetcher);
         this.#tickets = new TicketService(config.publicKey, transport);
@@ -40,7 +48,7 @@ export class EssAuth {
         auth.error = result.error;
         auth.#callbackValidated = result.callbackValidated;
         if (result.callbackValidated && result.employeeId) {
-            auth.#presence.connect(createPresenceIdentity(auth.#publicKey, result.employeeId));
+            auth.#startPresenceMonitoring(result.employeeId);
             auth.#unsubscribeIdentity = auth.#identity.onRemoved(result.employeeId, () => auth.#handleRemoteLogout());
         }
         return auth;
@@ -51,13 +59,13 @@ export class EssAuth {
             this.error = error;
             throw error;
         }
-        this.#presence.disconnect();
+        this.#stopPresenceMonitoring();
         this.#clearIdentity();
         redirectToLogin(this.#loginUrl, this.#publicKey);
     }
     async logout() {
         const employeeId = this.employeeId;
-        this.#presence.disconnect();
+        this.#stopPresenceMonitoring();
         this.#clearIdentity();
         if (!employeeId)
             return;
@@ -79,11 +87,48 @@ export class EssAuth {
     #handleRemoteLogout() {
         this.#unsubscribeIdentity?.();
         this.#unsubscribeIdentity = null;
-        this.#presence.disconnect();
+        this.#stopPresenceMonitoring();
         this.employeeId = null;
         this.error = null;
         if (typeof globalThis.location?.reload === "function") {
             globalThis.location.reload();
+        }
+    }
+    #startPresenceMonitoring(employeeId) {
+        this.#presenceIdentity = createPresenceIdentity(this.#publicKey, employeeId);
+        void this.#syncPresenceMonitoring();
+        this.#presenceSettingsTimer = setInterval(() => void this.#syncPresenceMonitoring(), PRESENCE_SETTINGS_REFRESH_MS);
+    }
+    #stopPresenceMonitoring() {
+        if (this.#presenceSettingsTimer !== null) {
+            clearInterval(this.#presenceSettingsTimer);
+            this.#presenceSettingsTimer = null;
+        }
+        this.#presenceIdentity = null;
+        this.#presenceEnabled = null;
+        this.#presence.disconnect();
+    }
+    async #syncPresenceMonitoring() {
+        if (!this.#presenceIdentity)
+            return;
+        let enabled = false;
+        try {
+            const response = await this.#fetcher(`${this.#apiUrl}/client-auth/presence/settings`, { method: "GET", cache: "no-store" });
+            const settings = await response.json();
+            enabled = response.ok && settings.enabled === true;
+        }
+        catch {
+            // Presence is optional telemetry. A temporary ESS failure must never
+            // interrupt an authenticated client application.
+        }
+        if (enabled === this.#presenceEnabled)
+            return;
+        this.#presenceEnabled = enabled;
+        if (enabled) {
+            this.#presence.connect(this.#presenceIdentity);
+        }
+        else {
+            this.#presence.disconnect();
         }
     }
 }

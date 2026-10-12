@@ -11,6 +11,8 @@ import type { PresenceTransport } from "../internal/transport/presence-transport
 import { WebSocketPresenceTransport } from "../internal/transport/websocket-presence-transport.js";
 import type { EssAuthInitOptions } from "./types.js";
 
+const PRESENCE_SETTINGS_REFRESH_MS = 60_000;
+
 /** Public redirect-authentication facade for client applications. */
 export class EssAuth {
   employeeId: string | null = null;
@@ -22,13 +24,20 @@ export class EssAuth {
   readonly #tickets: TicketService;
   readonly #callbacks: CallbackService;
   readonly #presence: PresenceTransport;
+  readonly #apiUrl: string;
+  readonly #fetcher: typeof globalThis.fetch;
   #callbackValidated = false;
   #unsubscribeIdentity: (() => void) | null = null;
+  #presenceIdentity: ReturnType<typeof createPresenceIdentity> | null = null;
+  #presenceEnabled: boolean | null = null;
+  #presenceSettingsTimer: ReturnType<typeof setInterval> | null = null;
 
   private constructor(options: EssAuthInitOptions) {
     const config = resolveConfig(options);
     this.#publicKey = config.publicKey;
     this.#loginUrl = config.loginUrl;
+    this.#apiUrl = config.apiUrl;
+    this.#fetcher = config.fetcher;
     this.#identity = new IdentityStore(
       config.storage,
       config.storageKey,
@@ -57,9 +66,7 @@ export class EssAuth {
     auth.error = result.error;
     auth.#callbackValidated = result.callbackValidated;
     if (result.callbackValidated && result.employeeId) {
-      auth.#presence.connect(
-        createPresenceIdentity(auth.#publicKey, result.employeeId),
-      );
+      auth.#startPresenceMonitoring(result.employeeId);
       auth.#unsubscribeIdentity = auth.#identity.onRemoved(
         result.employeeId,
         () => auth.#handleRemoteLogout(),
@@ -77,14 +84,14 @@ export class EssAuth {
       this.error = error;
       throw error;
     }
-    this.#presence.disconnect();
+    this.#stopPresenceMonitoring();
     this.#clearIdentity();
     redirectToLogin(this.#loginUrl, this.#publicKey);
   }
 
   async logout(): Promise<void> {
     const employeeId = this.employeeId;
-    this.#presence.disconnect();
+    this.#stopPresenceMonitoring();
     this.#clearIdentity();
     if (!employeeId) return;
     try {
@@ -106,11 +113,54 @@ export class EssAuth {
   #handleRemoteLogout(): void {
     this.#unsubscribeIdentity?.();
     this.#unsubscribeIdentity = null;
-    this.#presence.disconnect();
+    this.#stopPresenceMonitoring();
     this.employeeId = null;
     this.error = null;
     if (typeof globalThis.location?.reload === "function") {
       globalThis.location.reload();
+    }
+  }
+
+  #startPresenceMonitoring(employeeId: string): void {
+    this.#presenceIdentity = createPresenceIdentity(this.#publicKey, employeeId);
+    void this.#syncPresenceMonitoring();
+    this.#presenceSettingsTimer = setInterval(
+      () => void this.#syncPresenceMonitoring(),
+      PRESENCE_SETTINGS_REFRESH_MS,
+    );
+  }
+
+  #stopPresenceMonitoring(): void {
+    if (this.#presenceSettingsTimer !== null) {
+      clearInterval(this.#presenceSettingsTimer);
+      this.#presenceSettingsTimer = null;
+    }
+    this.#presenceIdentity = null;
+    this.#presenceEnabled = null;
+    this.#presence.disconnect();
+  }
+
+  async #syncPresenceMonitoring(): Promise<void> {
+    if (!this.#presenceIdentity) return;
+    let enabled = false;
+    try {
+      const response = await this.#fetcher(
+        `${this.#apiUrl}/client-auth/presence/settings`,
+        { method: "GET", cache: "no-store" },
+      );
+      const settings = await response.json() as { enabled?: unknown };
+      enabled = response.ok && settings.enabled === true;
+    } catch {
+      // Presence is optional telemetry. A temporary ESS failure must never
+      // interrupt an authenticated client application.
+    }
+
+    if (enabled === this.#presenceEnabled) return;
+    this.#presenceEnabled = enabled;
+    if (enabled) {
+      this.#presence.connect(this.#presenceIdentity);
+    } else {
+      this.#presence.disconnect();
     }
   }
 }

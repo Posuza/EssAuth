@@ -138,6 +138,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
   assert.equal(redirect.searchParams.get("public_key"), "Ab3dE6gH9jKm2NpQ");
   assert.equal(redirect.searchParams.get("return_to"), currentHref);
   assert.equal(loggedOut.employeeId, null);
+  await auth.logout();
 });
 
 test("offline initialization restores identity and logout remains local-first", async (context) => {
@@ -213,6 +214,7 @@ test("restored identity does not contact ESS", async (context) => {
 
   assert.equal(auth.employeeId, "680708");
   assert.equal(auth.error, null);
+  await auth.logout();
 });
 
 test("callback rejection is returned as an SDK error without another login loop", async (context) => {
