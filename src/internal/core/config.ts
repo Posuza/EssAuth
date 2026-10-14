@@ -44,10 +44,20 @@ export function resolveConfig(options: EssAuthInitOptions): ResolvedEssAuthConfi
     });
   }
 
+  const baseUrl = options.baseUrl
+    ? normalizedUrl(options.baseUrl, "baseUrl")
+    : null;
+
   return {
     publicKey,
-    apiUrl: normalizedUrl(options.apiUrl ?? DEFAULT_API_URL, "apiUrl"),
-    loginUrl: normalizedUrl(options.loginUrl ?? DEFAULT_LOGIN_URL, "loginUrl"),
+    apiUrl: normalizedUrl(
+      options.apiUrl ?? (baseUrl ? `${baseUrl}/api/v1` : DEFAULT_API_URL),
+      "apiUrl",
+    ),
+    loginUrl: normalizedUrl(
+      options.loginUrl ?? (baseUrl ? `${baseUrl}/client-auth/login` : DEFAULT_LOGIN_URL),
+      "loginUrl",
+    ),
     storage: options.storage ?? defaultStorage(),
     storageKey:
       options.storageKey?.trim() || `${DEFAULT_STORAGE_KEY}.${publicKey}`,

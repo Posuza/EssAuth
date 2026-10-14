@@ -144,13 +144,13 @@ The test build connects through the local ESS Caddy reverse proxy:
 - API: `https://essauth.localhost/api/v1`
 - Login: `https://essauth.localhost/client-auth/login`
 
-Self-hosted and local environments can override either endpoint:
+Self-hosted and local environments configure one ESS base URL. The SDK derives
+the API and hosted login paths internally:
 
 ```js
 const auth = await EssAuth.init({
   publicKey: "Ab3dE6gH9jKm2NpQ",
-  apiUrl: "https://custom-ess.example.com/api/v1",
-  loginUrl: "https://custom-ess.example.com/client-auth/login",
+  baseUrl: "https://custom-ess.example.com",
 });
 ```
 
