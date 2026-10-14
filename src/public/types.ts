@@ -7,14 +7,6 @@ export interface StorageLike {
 export interface EssAuthInitOptions {
   /** The mandatory 16-character identifier assigned by ESS. */
   publicKey: string;
-  /** ESS origin used to derive both the API and hosted login URLs. */
-  baseUrl?: string;
-  /** Override only when testing locally or using a self-hosted ESS API. */
-  /** @deprecated Prefer baseUrl unless the API is hosted separately. */
-  apiUrl?: string;
-  /** Override only when testing locally or using a self-hosted ESS login page. */
-  /** @deprecated Prefer baseUrl unless the login page is hosted separately. */
-  loginUrl?: string;
   /** Override the SDK's coordinated localStorage/sessionStorage persistence. */
   storage?: StorageLike | null;
   storageKey?: string;

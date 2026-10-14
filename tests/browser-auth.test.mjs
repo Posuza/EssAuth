@@ -82,8 +82,6 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
   };
   const options = {
     publicKey: "Ab3dE6gH9jKm2NpQ",
-    apiUrl: "https://api.example.test/api/v1",
-    loginUrl: "https://ess.example.test/client-auth/login",
     storage,
     fetch,
   };
@@ -94,7 +92,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
   assert.equal(auth.error, null);
   assert.deepEqual(requests, [
     {
-      url: "https://api.example.test/api/v1/client-auth/callback/validate",
+      url: "https://relevant-doctor-will-sell-electronic.trycloudflare.com/api/v1/client-auth/callback/validate",
       body: {
         public_key: "Ab3dE6gH9jKm2NpQ",
         return_to: "https://client.example.test/payroll?view=summary&ticket=opaque-ticket#totals",
@@ -102,7 +100,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
       keepalive: false,
     },
     {
-      url: "https://api.example.test/api/v1/client-auth/tickets/verify",
+      url: "https://relevant-doctor-will-sell-electronic.trycloudflare.com/api/v1/client-auth/tickets/verify",
       body: {
         public_key: "Ab3dE6gH9jKm2NpQ",
         ticket: "opaque-ticket",
@@ -120,7 +118,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
   assert.equal(restored.employeeId, null);
   assert.equal(storage.values.size, 0);
   assert.deepEqual(requests[2], {
-    url: "https://api.example.test/api/v1/client-auth/logout",
+    url: "https://relevant-doctor-will-sell-electronic.trycloudflare.com/api/v1/client-auth/logout",
     body: {
       public_key: "Ab3dE6gH9jKm2NpQ",
       employee_id: "680708",
@@ -134,7 +132,12 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
 
   loggedOut.login();
   const redirect = new URL(assignedUrl);
-  assert.equal(redirect.href.startsWith("https://ess.example.test/client-auth/login?"), true);
+  assert.equal(
+    redirect.href.startsWith(
+      "https://relevant-doctor-will-sell-electronic.trycloudflare.com/client-auth/login?",
+    ),
+    true,
+  );
   assert.equal(redirect.searchParams.get("public_key"), "Ab3dE6gH9jKm2NpQ");
   assert.equal(redirect.searchParams.get("return_to"), currentHref);
   assert.equal(loggedOut.employeeId, null);

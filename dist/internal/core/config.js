@@ -1,21 +1,10 @@
 import { EssAuthError } from "./errors.js";
 import { defaultStorage } from "../storage/browser-storage.js";
-const DEFAULT_API_URL = "https://essauth.localhost/api/v1";
-const DEFAULT_LOGIN_URL = "https://essauth.localhost/client-auth/login";
+const ESS_ORIGIN = "https://relevant-doctor-will-sell-electronic.trycloudflare.com";
+const ESS_API_URL = `${ESS_ORIGIN}/api/v1`;
+const ESS_LOGIN_URL = `${ESS_ORIGIN}/client-auth/login`;
 const DEFAULT_STORAGE_KEY = "ess-auth-o1.client-identity.v1";
 const PUBLIC_KEY_PATTERN = /^[A-Za-z0-9_-]{16}$/;
-function normalizedUrl(value, name) {
-    const normalized = value.trim().replace(/\/+$/, "");
-    if (!normalized) {
-        throw new EssAuthError(`${name} cannot be empty.`, { code: "INVALID_CONFIG" });
-    }
-    try {
-        return new URL(normalized).toString().replace(/\/+$/, "");
-    }
-    catch {
-        throw new EssAuthError(`${name} must be a valid URL.`, { code: "INVALID_CONFIG" });
-    }
-}
 export function resolveConfig(options) {
     const publicKey = options.publicKey.trim();
     if (!PUBLIC_KEY_PATTERN.test(publicKey)) {
@@ -27,13 +16,10 @@ export function resolveConfig(options) {
             code: "FETCH_REQUIRED",
         });
     }
-    const baseUrl = options.baseUrl
-        ? normalizedUrl(options.baseUrl, "baseUrl")
-        : null;
     return {
         publicKey,
-        apiUrl: normalizedUrl(options.apiUrl ?? (baseUrl ? `${baseUrl}/api/v1` : DEFAULT_API_URL), "apiUrl"),
-        loginUrl: normalizedUrl(options.loginUrl ?? (baseUrl ? `${baseUrl}/client-auth/login` : DEFAULT_LOGIN_URL), "loginUrl"),
+        apiUrl: ESS_API_URL,
+        loginUrl: ESS_LOGIN_URL,
         storage: options.storage ?? defaultStorage(),
         storageKey: options.storageKey?.trim() || `${DEFAULT_STORAGE_KEY}.${publicKey}`,
         fetcher,

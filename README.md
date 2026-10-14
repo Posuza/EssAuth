@@ -138,25 +138,11 @@ and verified employee ID to ESS for audit logging. Consumers do not build or
 send that payload themselves. A notification failure never prevents local
 logout. This notification does not revoke a server session or token.
 
-## Local testing
+## ESS service
 
-The test build connects through the local ESS Caddy reverse proxy:
-
-- API: `https://essauth.localhost/api/v1`
-- Login: `https://essauth.localhost/client-auth/login`
-
-Self-hosted and local environments configure one ESS base URL. The SDK derives
-the API and hosted login paths internally:
-
-```js
-const auth = await EssAuth.init({
-  publicKey: "Ab3dE6gH9jKm2NpQ",
-  baseUrl: "https://custom-ess.example.com",
-});
-```
-
-Production CDN builds should set their deployment defaults so ordinary HTML
-clients need to provide only `publicKey`.
+The SDK owns the ESS service address and derives its API, login, logout, and
+presence endpoints internally. Client applications must not configure or
+construct ESS URLs. They provide only the public key assigned by ESS.
 
 ## Security boundary
 
