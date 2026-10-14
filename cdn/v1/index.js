@@ -457,6 +457,7 @@ var WebSocketPresenceTransport = class {
     this.#geolocation = geolocation;
   }
   connect(identity) {
+    if (this.#active && this.#identity?.publicKey === identity.publicKey && this.#identity.employeeId === identity.employeeId && this.#identity.deviceId === identity.deviceId) return;
     this.disconnect();
     if (!this.#webSocketConstructor) return;
     this.#active = true;
@@ -733,7 +734,6 @@ var EssAuth = class _EssAuth {
     } catch {
       return;
     }
-    if (enabled === this.#presenceEnabled) return;
     this.#presenceEnabled = enabled;
     if (enabled) {
       this.#presence.connect(this.#presenceIdentity);

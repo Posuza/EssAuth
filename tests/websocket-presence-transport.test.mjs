@@ -258,3 +258,28 @@ test("presence transport does not retry a policy-rejected identity", async () =>
 
   assert.equal(FakeWebSocket.instances.length, 1);
 });
+
+test("presence connect is idempotent and can restart after a policy rejection", () => {
+  FakeWebSocket.instances = [];
+  const presence = new WebSocketPresenceTransport(
+    "https://ess.example.test/api/v1",
+    FakeWebSocket,
+    60_000,
+    60_000,
+    null,
+  );
+  const identity = {
+    publicKey: "Tg2wbdIU3C0JRfSX",
+    employeeId: "680708",
+    deviceId: "device_test_1234",
+  };
+
+  presence.connect(identity);
+  presence.connect(identity);
+  assert.equal(FakeWebSocket.instances.length, 1);
+
+  FakeWebSocket.instances[0].close(1008);
+  presence.connect(identity);
+  assert.equal(FakeWebSocket.instances.length, 2);
+  presence.disconnect();
+});

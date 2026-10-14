@@ -74,6 +74,12 @@ export class WebSocketPresenceTransport implements PresenceTransport {
   }
 
   connect(identity: PresenceIdentity): void {
+    if (
+      this.#active
+      && this.#identity?.publicKey === identity.publicKey
+      && this.#identity.employeeId === identity.employeeId
+      && this.#identity.deviceId === identity.deviceId
+    ) return;
     this.disconnect();
     if (!this.#webSocketConstructor) return;
 

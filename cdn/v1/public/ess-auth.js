@@ -124,10 +124,10 @@ export class EssAuth {
             // interrupt authentication or tear down an existing live connection.
             return;
         }
-        if (enabled === this.#presenceEnabled)
-            return;
         this.#presenceEnabled = enabled;
         if (enabled) {
+            // connect() is idempotent. It also revives a transport that previously
+            // stopped after the server rejected presence while monitoring was off.
             this.#presence.connect(this.#presenceIdentity);
         }
         else {

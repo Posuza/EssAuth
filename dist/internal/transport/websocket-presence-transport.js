@@ -43,6 +43,11 @@ export class WebSocketPresenceTransport {
         this.#geolocation = geolocation;
     }
     connect(identity) {
+        if (this.#active
+            && this.#identity?.publicKey === identity.publicKey
+            && this.#identity.employeeId === identity.employeeId
+            && this.#identity.deviceId === identity.deviceId)
+            return;
         this.disconnect();
         if (!this.#webSocketConstructor)
             return;
