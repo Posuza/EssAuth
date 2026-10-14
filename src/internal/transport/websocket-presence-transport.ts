@@ -204,28 +204,34 @@ export class WebSocketPresenceTransport implements PresenceTransport {
       || this.#locationWatchId !== null
       || this.#locationDisabled
     ) return;
-    this.#locationWatchId = this.#geolocation.watchPosition(
-      (position) => {
-        if (!this.#active) return;
-        this.#location = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        };
-        const socket = this.#socket;
-        if (socket?.readyState === 1) this.#sendHeartbeat(socket);
-      },
-      (error) => {
-        if (error.code === 1) {
-          this.#locationDisabled = true;
-          this.#stopLocationWatch();
-        }
-      },
-      {
-        enableHighAccuracy: false,
-        maximumAge: 15_000,
-        timeout: 10_000,
-      },
-    );
+    try {
+      this.#locationWatchId = this.#geolocation.watchPosition(
+        (position) => {
+          if (!this.#active) return;
+          this.#location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+          const socket = this.#socket;
+          if (socket?.readyState === 1) this.#sendHeartbeat(socket);
+        },
+        (error) => {
+          if (error.code === 1) {
+            this.#locationDisabled = true;
+            this.#stopLocationWatch();
+          }
+        },
+        {
+          enableHighAccuracy: false,
+          maximumAge: 15_000,
+          timeout: 10_000,
+        },
+      );
+    } catch {
+      // Browser location policy must never prevent presence connectivity.
+      this.#locationDisabled = true;
+      this.#locationWatchId = null;
+    }
   }
 
   #stopLocationWatch(): void {
