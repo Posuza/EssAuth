@@ -22,7 +22,7 @@ semantic v1 release with a five-minute URL bucket:
 ```js
 const bucket = Math.floor(Date.now() / 300_000);
 const sdkUrl =
-  `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@1/cdn/v1/index.js?v=${bucket}`;
+  `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@release-v1/cdn/v1/index.js?v=${bucket}`;
 const { default: EssAuth } = await import(sdkUrl);
 ```
 
