@@ -15,10 +15,10 @@ test("SDK owns the fixed ESS API and hosted login endpoints", () => {
 
   assert.equal(
     config.apiUrl,
-    "https://relevant-doctor-will-sell-electronic.trycloudflare.com/api/v1",
+    "https://lynn-gray-frequent-attitude.trycloudflare.com/api/v1",
   );
   assert.equal(
     config.loginUrl,
-    "https://relevant-doctor-will-sell-electronic.trycloudflare.com/client-auth/login",
+    "https://lynn-gray-frequent-attitude.trycloudflare.com/client-auth/login",
   );
 });
