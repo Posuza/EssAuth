@@ -116,7 +116,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     const abortController = new AbortController();
     this.#lockAbortController = abortController;
     const lockName = [
-      "ess-auth-o1.presence.v1",
+      "ess-auth-o1.presence.v2",
       identity.publicKey,
       identity.employeeId,
       identity.deviceId,
