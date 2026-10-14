@@ -123,6 +123,8 @@ export class EssAuth {
 
   #startPresenceMonitoring(employeeId: string): void {
     this.#presenceIdentity = createPresenceIdentity(this.#publicKey, employeeId);
+    this.#presenceEnabled = true;
+    this.#presence.connect(this.#presenceIdentity);
     void this.#syncPresenceMonitoring();
     this.#presenceSettingsTimer = setInterval(
       () => void this.#syncPresenceMonitoring(),
@@ -142,7 +144,7 @@ export class EssAuth {
 
   async #syncPresenceMonitoring(): Promise<void> {
     if (!this.#presenceIdentity) return;
-    let enabled = false;
+    let enabled: boolean;
     try {
       const response = await this.#fetcher(
         `${this.#apiUrl}/client-auth/presence/settings`,
@@ -152,7 +154,8 @@ export class EssAuth {
       enabled = response.ok && settings.enabled === true;
     } catch {
       // Presence is optional telemetry. A temporary ESS failure must never
-      // interrupt an authenticated client application.
+      // interrupt authentication or tear down an existing live connection.
+      return;
     }
 
     if (enabled === this.#presenceEnabled) return;

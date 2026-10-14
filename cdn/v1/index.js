@@ -698,6 +698,8 @@ var EssAuth = class _EssAuth {
   }
   #startPresenceMonitoring(employeeId) {
     this.#presenceIdentity = createPresenceIdentity(this.#publicKey, employeeId);
+    this.#presenceEnabled = true;
+    this.#presence.connect(this.#presenceIdentity);
     void this.#syncPresenceMonitoring();
     this.#presenceSettingsTimer = setInterval(
       () => void this.#syncPresenceMonitoring(),
@@ -715,7 +717,7 @@ var EssAuth = class _EssAuth {
   }
   async #syncPresenceMonitoring() {
     if (!this.#presenceIdentity) return;
-    let enabled = false;
+    let enabled;
     try {
       const response = await this.#fetcher(
         `${this.#apiUrl}/client-auth/presence/settings`,
@@ -724,6 +726,7 @@ var EssAuth = class _EssAuth {
       const settings = await response.json();
       enabled = response.ok && settings.enabled === true;
     } catch {
+      return;
     }
     if (enabled === this.#presenceEnabled) return;
     this.#presenceEnabled = enabled;
