@@ -49,6 +49,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
   #identity: PresenceIdentity | null = null;
   #socket: WebSocket | null = null;
   #heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  #awaitingHeartbeatAck = false;
   #reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   #lockAbortController: AbortController | null = null;
   #releaseLock: (() => void) | null = null;
@@ -164,17 +165,33 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     this.#socket = socket;
     socket.onopen = () => {
       if (!this.#active || this.#socket !== socket) return;
-      this.#sendHeartbeat(socket);
+      this.#sendHeartbeat(socket, true);
       this.#heartbeatTimer = setInterval(
-        () => this.#sendHeartbeat(socket),
+        () => {
+          if (this.#awaitingHeartbeatAck) {
+            this.#restartSocket(socket);
+            return;
+          }
+          this.#sendHeartbeat(socket, true);
+        },
         this.#heartbeatIntervalMs,
       );
+    };
+    socket.onmessage = (event) => {
+      if (this.#socket !== socket) return;
+      try {
+        const message = JSON.parse(String(event.data)) as { type?: unknown };
+        if (message.type === "heartbeat_ack") this.#awaitingHeartbeatAck = false;
+      } catch {
+        // Ignore messages that are unrelated to the presence protocol.
+      }
     };
     socket.onerror = () => {
       // Browsers emit a close event after a connection error; reconnect there.
     };
     socket.onclose = (event) => {
-      if (this.#socket === socket) this.#socket = null;
+      if (this.#socket !== socket) return;
+      this.#socket = null;
       this.#clearHeartbeatTimer();
       this.#stopLocationWatch();
       if (!this.#active) return;
@@ -182,25 +199,48 @@ export class WebSocketPresenceTransport implements PresenceTransport {
         this.#active = false;
         return;
       }
-      this.#reconnectTimer = setTimeout(() => {
-        this.#reconnectTimer = null;
-        this.#openSocket();
-      }, this.#reconnectDelayMs);
+      this.#scheduleReconnect();
     };
   }
 
-  #sendHeartbeat(socket: WebSocket): void {
+  #sendHeartbeat(socket: WebSocket, trackAck = false): void {
     if (
       this.#socket !== socket
       || socket.readyState !== 1
       || !this.#identity
     ) return;
-    socket.send(JSON.stringify({
-      type: "heartbeat",
-      employee_id: this.#identity.employeeId,
-      device_id: this.#identity.deviceId,
-      ...(this.#location ?? {}),
-    }));
+    try {
+      socket.send(JSON.stringify({
+        type: "heartbeat",
+        employee_id: this.#identity.employeeId,
+        device_id: this.#identity.deviceId,
+        ...(this.#location ?? {}),
+      }));
+      if (trackAck) this.#awaitingHeartbeatAck = true;
+    } catch {
+      this.#restartSocket(socket);
+    }
+  }
+
+  #restartSocket(socket: WebSocket): void {
+    if (this.#socket !== socket) return;
+    this.#socket = null;
+    this.#clearHeartbeatTimer();
+    this.#stopLocationWatch();
+    try {
+      if (socket.readyState < 2) socket.close(4000, "Heartbeat acknowledgement timed out");
+    } catch {
+      // The replacement connection is scheduled even if the stale socket cannot close cleanly.
+    }
+    if (this.#active) this.#scheduleReconnect();
+  }
+
+  #scheduleReconnect(): void {
+    if (this.#reconnectTimer !== null) return;
+    this.#reconnectTimer = setTimeout(() => {
+      this.#reconnectTimer = null;
+      this.#openSocket();
+    }, this.#reconnectDelayMs);
   }
 
   #startLocationWatch(): void {
@@ -247,6 +287,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
   }
 
   #clearHeartbeatTimer(): void {
+    this.#awaitingHeartbeatAck = false;
     if (this.#heartbeatTimer === null) return;
     clearInterval(this.#heartbeatTimer);
     this.#heartbeatTimer = null;

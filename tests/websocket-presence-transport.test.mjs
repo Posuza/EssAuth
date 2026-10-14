@@ -12,6 +12,7 @@ class FakeWebSocket {
   onopen = null;
   onerror = null;
   onclose = null;
+  onmessage = null;
 
   constructor(url) {
     this.url = url.toString();
@@ -25,6 +26,10 @@ class FakeWebSocket {
 
   send(payload) {
     this.sent.push(payload);
+  }
+
+  receive(payload) {
+    this.onmessage?.({ data: JSON.stringify(payload) });
   }
 
   close(code = 1000) {
@@ -282,4 +287,57 @@ test("presence connect is idempotent and can restart after a policy rejection", 
   presence.connect(identity);
   assert.equal(FakeWebSocket.instances.length, 2);
   presence.disconnect();
+});
+
+test("presence replaces a stale open socket when heartbeat acknowledgements stop", async (context) => {
+  FakeWebSocket.instances = [];
+  const presence = new WebSocketPresenceTransport(
+    "https://ess.example.test/api/v1",
+    FakeWebSocket,
+    5,
+    1,
+    null,
+    null,
+  );
+  context.after(() => presence.disconnect());
+
+  presence.connect({
+    publicKey: "Tg2wbdIU3C0JRfSX",
+    employeeId: "680708",
+    deviceId: "device_test_1234",
+  });
+  FakeWebSocket.instances[0].open();
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  assert.equal(FakeWebSocket.instances[0].closeCode, 4000);
+  assert.equal(FakeWebSocket.instances.length, 2);
+});
+
+test("heartbeat acknowledgements keep the current socket alive", async (context) => {
+  FakeWebSocket.instances = [];
+  const presence = new WebSocketPresenceTransport(
+    "https://ess.example.test/api/v1",
+    FakeWebSocket,
+    5,
+    1,
+    null,
+    null,
+  );
+  context.after(() => presence.disconnect());
+
+  presence.connect({
+    publicKey: "Tg2wbdIU3C0JRfSX",
+    employeeId: "680708",
+    deviceId: "device_test_1234",
+  });
+  const socket = FakeWebSocket.instances[0];
+  socket.open();
+  socket.receive({ type: "heartbeat_ack" });
+  await new Promise((resolve) => setTimeout(resolve, 6));
+  socket.receive({ type: "heartbeat_ack" });
+  await new Promise((resolve) => setTimeout(resolve, 6));
+  socket.receive({ type: "heartbeat_ack" });
+  await new Promise((resolve) => setTimeout(resolve, 1));
+
+  assert.equal(FakeWebSocket.instances.length, 1);
 });

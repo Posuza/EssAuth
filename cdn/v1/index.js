@@ -441,6 +441,7 @@ var WebSocketPresenceTransport = class {
   #identity = null;
   #socket = null;
   #heartbeatTimer = null;
+  #awaitingHeartbeatAck = false;
   #reconnectTimer = null;
   #lockAbortController = null;
   #releaseLock = null;
@@ -532,16 +533,31 @@ var WebSocketPresenceTransport = class {
     this.#socket = socket;
     socket.onopen = () => {
       if (!this.#active || this.#socket !== socket) return;
-      this.#sendHeartbeat(socket);
+      this.#sendHeartbeat(socket, true);
       this.#heartbeatTimer = setInterval(
-        () => this.#sendHeartbeat(socket),
+        () => {
+          if (this.#awaitingHeartbeatAck) {
+            this.#restartSocket(socket);
+            return;
+          }
+          this.#sendHeartbeat(socket, true);
+        },
         this.#heartbeatIntervalMs
       );
+    };
+    socket.onmessage = (event) => {
+      if (this.#socket !== socket) return;
+      try {
+        const message = JSON.parse(String(event.data));
+        if (message.type === "heartbeat_ack") this.#awaitingHeartbeatAck = false;
+      } catch {
+      }
     };
     socket.onerror = () => {
     };
     socket.onclose = (event) => {
-      if (this.#socket === socket) this.#socket = null;
+      if (this.#socket !== socket) return;
+      this.#socket = null;
       this.#clearHeartbeatTimer();
       this.#stopLocationWatch();
       if (!this.#active) return;
@@ -549,20 +565,40 @@ var WebSocketPresenceTransport = class {
         this.#active = false;
         return;
       }
-      this.#reconnectTimer = setTimeout(() => {
-        this.#reconnectTimer = null;
-        this.#openSocket();
-      }, this.#reconnectDelayMs);
+      this.#scheduleReconnect();
     };
   }
-  #sendHeartbeat(socket) {
+  #sendHeartbeat(socket, trackAck = false) {
     if (this.#socket !== socket || socket.readyState !== 1 || !this.#identity) return;
-    socket.send(JSON.stringify({
-      type: "heartbeat",
-      employee_id: this.#identity.employeeId,
-      device_id: this.#identity.deviceId,
-      ...this.#location ?? {}
-    }));
+    try {
+      socket.send(JSON.stringify({
+        type: "heartbeat",
+        employee_id: this.#identity.employeeId,
+        device_id: this.#identity.deviceId,
+        ...this.#location ?? {}
+      }));
+      if (trackAck) this.#awaitingHeartbeatAck = true;
+    } catch {
+      this.#restartSocket(socket);
+    }
+  }
+  #restartSocket(socket) {
+    if (this.#socket !== socket) return;
+    this.#socket = null;
+    this.#clearHeartbeatTimer();
+    this.#stopLocationWatch();
+    try {
+      if (socket.readyState < 2) socket.close(4e3, "Heartbeat acknowledgement timed out");
+    } catch {
+    }
+    if (this.#active) this.#scheduleReconnect();
+  }
+  #scheduleReconnect() {
+    if (this.#reconnectTimer !== null) return;
+    this.#reconnectTimer = setTimeout(() => {
+      this.#reconnectTimer = null;
+      this.#openSocket();
+    }, this.#reconnectDelayMs);
   }
   #startLocationWatch() {
     if (!this.#active || !this.#geolocation || this.#locationWatchId !== null || this.#locationDisabled) return;
@@ -600,6 +636,7 @@ var WebSocketPresenceTransport = class {
     this.#locationWatchId = null;
   }
   #clearHeartbeatTimer() {
+    this.#awaitingHeartbeatAck = false;
     if (this.#heartbeatTimer === null) return;
     clearInterval(this.#heartbeatTimer);
     this.#heartbeatTimer = null;
