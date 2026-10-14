@@ -16,19 +16,20 @@ Choose the integration that matches the client application:
 - [Plain HTML integration](./docs/PLAIN_HTML.md)
 - [React and Vite integration](./docs/REACT_VITE.md)
 
-For an automatic CDN channel, client applications load the floating
-`release-v1` bundle with a five-minute URL bucket:
+For an automatic CDN channel, client applications load the latest compatible
+semantic v1 release with a five-minute URL bucket:
 
 ```js
 const bucket = Math.floor(Date.now() / 300_000);
 const sdkUrl =
-  `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@release-v1/cdn/v1/index.js?v=${bucket}`;
+  `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@1/cdn/v1/index.js?v=${bucket}`;
 const { default: EssAuth } = await import(sdkUrl);
 ```
 
-This one-time client loader allows compatible SDK updates without changing or
-restarting the client application server. An already-open page must reload
-before it can execute newly published JavaScript.
+This one-time client loader allows compatible `v1.x.x` SDK updates without
+changing or restarting the client application server. Publish each update as a
+new semantic version tag; never replace an existing tag. An already-open page
+must reload before it can execute newly published JavaScript.
 
 ## Use
 

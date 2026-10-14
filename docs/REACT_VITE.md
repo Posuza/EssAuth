@@ -21,7 +21,7 @@ Create `src/services/ess-auth.ts`:
 ```ts
 const bucket = Math.floor(Date.now() / 300_000);
 const SDK_URL =
-  `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@release-v1/cdn/v1/index.js?v=${bucket}`;
+  `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@1/cdn/v1/index.js?v=${bucket}`;
 
 type EssAuthClient = {
   employeeId: string | null;
@@ -138,8 +138,8 @@ from the error state.
 
 ## SDK updates
 
-The five-minute bucket lets a page reload discover compatible updates from
-`release-v1` without changing client code or restarting Vite. It does not
+The five-minute bucket lets a page reload discover compatible updates from the
+latest v1 tag without changing client code or restarting Vite. It does not
 replace JavaScript inside a page that is already open.
 
 See [Installation](./INSTALLATION.md) for pinned CDN and package alternatives.

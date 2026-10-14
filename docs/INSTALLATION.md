@@ -8,20 +8,20 @@ frontend code; never place a private key or application secret in the browser.
 
 ### Automatic compatible updates
 
-Use the floating `release-v1` channel when clients should receive compatible
+Use the `@1` semantic-version channel when clients should receive compatible
 SDK updates without another client deployment:
 
 ```js
 const bucket = Math.floor(Date.now() / 300_000);
 const sdkUrl =
-  `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@release-v1/cdn/v1/index.js?v=${bucket}`;
+  `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@1/cdn/v1/index.js?v=${bucket}`;
 const { default: EssAuth } = await import(sdkUrl);
 ```
 
-The query bucket changes every five minutes. It prevents a browser from keeping
-an outdated branch bundle indefinitely while preserving short-term caching. A
-page that is already open continues running its loaded SDK until the user
-reloads it. The frontend development server does not need to restart.
+The query bucket changes every five minutes. It lets a reloaded page discover a
+newly published v1 tag while preserving short-term browser caching. A page that
+is already open continues running its loaded SDK until the user reloads it. The
+frontend development server does not need to restart.
 
 ### Pinned CDN release
 
@@ -30,7 +30,7 @@ update explicitly:
 
 ```js
 import EssAuth from
-  "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@v1.2.0/cdn/v1/index.js";
+  "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@v1.3.0/cdn/v1/index.js";
 ```
 
 Pinned clients update by changing the tag in their own release. Keep old tags
@@ -41,7 +41,7 @@ available so existing deployments remain reproducible and can roll back.
 Install a tagged GitHub release:
 
 ```bash
-npm install github:Posuza/EssAuth#v1.2.0
+npm install github:Posuza/EssAuth#v1.3.0
 ```
 
 Then import the package:
