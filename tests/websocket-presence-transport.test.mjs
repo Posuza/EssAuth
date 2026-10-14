@@ -146,6 +146,37 @@ test("presence heartbeat includes coordinates when browser location is available
   assert.equal(clearedWatchId, 7);
 });
 
+test("presence remains connected while the client tab is hidden", (context) => {
+  const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+  context.after(() => {
+    if (originalDocument) Object.defineProperty(globalThis, "document", originalDocument);
+    else delete globalThis.document;
+  });
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: { visibilityState: "hidden" },
+  });
+
+  FakeWebSocket.instances = [];
+  const presence = new WebSocketPresenceTransport(
+    "https://ess.example.test/api/v1",
+    FakeWebSocket,
+    60_000,
+    60_000,
+    null,
+    null,
+  );
+
+  presence.connect({
+    publicKey: "Tg2wbdIU3C0JRfSX",
+    employeeId: "680708",
+    deviceId: "device_test_1234",
+  });
+
+  assert.equal(FakeWebSocket.instances.length, 1);
+  presence.disconnect();
+});
+
 test("tabs sharing one identity elect a single presence connection", async () => {
   FakeWebSocket.instances = [];
   const locks = new FakeLockManager();

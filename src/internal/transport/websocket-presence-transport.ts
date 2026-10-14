@@ -53,8 +53,6 @@ export class WebSocketPresenceTransport implements PresenceTransport {
   #lockAbortController: AbortController | null = null;
   #releaseLock: (() => void) | null = null;
   #generation = 0;
-  #paused = false;
-  #visibilityListener: (() => void) | null = null;
   #location: PresenceLocation | null = null;
   #locationWatchId: number | null = null;
   #locationDisabled = false;
@@ -81,14 +79,11 @@ export class WebSocketPresenceTransport implements PresenceTransport {
 
     this.#active = true;
     this.#identity = identity;
-    this.#watchVisibility();
     this.#startPresenceOwner();
   }
 
   disconnect(): void {
     this.#active = false;
-    this.#paused = false;
-    this.#unwatchVisibility();
     this.#generation++;
     this.#releaseLock?.();
     this.#releaseLock = null;
@@ -146,7 +141,7 @@ export class WebSocketPresenceTransport implements PresenceTransport {
   }
 
   #openSocket(): void {
-    if (!this.#active || this.#paused || !this.#webSocketConstructor) return;
+    if (!this.#active || !this.#webSocketConstructor) return;
     if (this.#socket && this.#socket.readyState < 2) return;
 
     const url = new URL(this.#apiUrl);
@@ -245,32 +240,4 @@ export class WebSocketPresenceTransport implements PresenceTransport {
     this.#heartbeatTimer = null;
   }
 
-  #watchVisibility(): void {
-    const documentRef = globalThis.document;
-    if (!documentRef?.addEventListener || this.#visibilityListener) return;
-    this.#paused = documentRef.visibilityState === "hidden";
-    this.#visibilityListener = () => {
-      const hidden = documentRef.visibilityState === "hidden";
-      if (hidden === this.#paused) return;
-      this.#paused = hidden;
-      if (hidden) {
-        this.#clearHeartbeatTimer();
-        this.#stopLocationWatch();
-        const socket = this.#socket;
-        this.#socket = null;
-        if (socket && socket.readyState < 2) socket.close(1000, "Page hidden");
-        return;
-      }
-      this.#openSocket();
-    };
-    documentRef.addEventListener("visibilitychange", this.#visibilityListener);
-  }
-
-  #unwatchVisibility(): void {
-    const documentRef = globalThis.document;
-    if (this.#visibilityListener && documentRef?.removeEventListener) {
-      documentRef.removeEventListener("visibilitychange", this.#visibilityListener);
-    }
-    this.#visibilityListener = null;
-  }
 }

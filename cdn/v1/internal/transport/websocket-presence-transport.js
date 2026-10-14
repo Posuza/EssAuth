@@ -31,8 +31,6 @@ export class WebSocketPresenceTransport {
     #lockAbortController = null;
     #releaseLock = null;
     #generation = 0;
-    #paused = false;
-    #visibilityListener = null;
     #location = null;
     #locationWatchId = null;
     #locationDisabled = false;
@@ -50,13 +48,10 @@ export class WebSocketPresenceTransport {
             return;
         this.#active = true;
         this.#identity = identity;
-        this.#watchVisibility();
         this.#startPresenceOwner();
     }
     disconnect() {
         this.#active = false;
-        this.#paused = false;
-        this.#unwatchVisibility();
         this.#generation++;
         this.#releaseLock?.();
         this.#releaseLock = null;
@@ -109,7 +104,7 @@ export class WebSocketPresenceTransport {
         });
     }
     #openSocket() {
-        if (!this.#active || this.#paused || !this.#webSocketConstructor)
+        if (!this.#active || !this.#webSocketConstructor)
             return;
         if (this.#socket && this.#socket.readyState < 2)
             return;
@@ -201,36 +196,6 @@ export class WebSocketPresenceTransport {
             return;
         clearInterval(this.#heartbeatTimer);
         this.#heartbeatTimer = null;
-    }
-    #watchVisibility() {
-        const documentRef = globalThis.document;
-        if (!documentRef?.addEventListener || this.#visibilityListener)
-            return;
-        this.#paused = documentRef.visibilityState === "hidden";
-        this.#visibilityListener = () => {
-            const hidden = documentRef.visibilityState === "hidden";
-            if (hidden === this.#paused)
-                return;
-            this.#paused = hidden;
-            if (hidden) {
-                this.#clearHeartbeatTimer();
-                this.#stopLocationWatch();
-                const socket = this.#socket;
-                this.#socket = null;
-                if (socket && socket.readyState < 2)
-                    socket.close(1000, "Page hidden");
-                return;
-            }
-            this.#openSocket();
-        };
-        documentRef.addEventListener("visibilitychange", this.#visibilityListener);
-    }
-    #unwatchVisibility() {
-        const documentRef = globalThis.document;
-        if (this.#visibilityListener && documentRef?.removeEventListener) {
-            documentRef.removeEventListener("visibilitychange", this.#visibilityListener);
-        }
-        this.#visibilityListener = null;
     }
 }
 //# sourceMappingURL=websocket-presence-transport.js.map
