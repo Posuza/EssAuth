@@ -1,4 +1,5 @@
 import { cp, mkdir, rm } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
 const distDirectory = new URL("../dist/", import.meta.url);
@@ -8,8 +9,8 @@ await rm(cdnDirectory, { force: true, recursive: true });
 await mkdir(cdnDirectory, { recursive: true });
 await cp(distDirectory, cdnDirectory, { recursive: true });
 await build({
-  entryPoints: [new URL("../src/index.ts", import.meta.url).pathname],
-  outfile: new URL("../cdn/v1/index.js", import.meta.url).pathname,
+  entryPoints: [fileURLToPath(new URL("../src/index.ts", import.meta.url))],
+  outfile: fileURLToPath(new URL("../cdn/v1/index.js", import.meta.url)),
   bundle: true,
   format: "esm",
   platform: "browser",
