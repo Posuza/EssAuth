@@ -30,7 +30,7 @@ update explicitly:
 
 ```js
 import EssAuth from
-  "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@v1.3.0/cdn/v1/index.js";
+  "https://cdn.jsdelivr.net/gh/Posuza/EssAuth@v1.4.0/cdn/v1/index.js";
 ```
 
 Pinned clients update by changing the tag in their own release. Keep old tags
@@ -41,7 +41,7 @@ available so existing deployments remain reproducible and can roll back.
 Install a tagged GitHub release:
 
 ```bash
-npm install github:Posuza/EssAuth#v1.3.0
+npm install github:Posuza/EssAuth#v1.4.0
 ```
 
 Then import the package:
