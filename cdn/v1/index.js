@@ -319,7 +319,7 @@ function defaultStorage() {
 }
 
 // src/internal/core/config.ts
-var ESS_ORIGIN = "https://live-replace-pearl-capabilities.trycloudflare.com";
+var ESS_ORIGIN = "https://occupational-reno-athletes-allowance.trycloudflare.com";
 var ESS_API_URL = `${ESS_ORIGIN}/api/v1`;
 var ESS_LOGIN_URL = `${ESS_ORIGIN}/client-auth/login`;
 var DEFAULT_STORAGE_KEY = "ess-auth-o1.client-identity.v1";

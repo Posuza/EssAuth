@@ -15,10 +15,10 @@ test("SDK owns the fixed ESS API and hosted login endpoints", () => {
 
   assert.equal(
     config.apiUrl,
-    "https://live-replace-pearl-capabilities.trycloudflare.com/api/v1",
+    "https://occupational-reno-athletes-allowance.trycloudflare.com/api/v1",
   );
   assert.equal(
     config.loginUrl,
-    "https://live-replace-pearl-capabilities.trycloudflare.com/client-auth/login",
+    "https://occupational-reno-athletes-allowance.trycloudflare.com/client-auth/login",
   );
 });
