@@ -151,6 +151,41 @@ test("presence heartbeat includes coordinates when browser location is available
   assert.equal(clearedWatchId, 7);
 });
 
+test("location updates wait for the scheduled heartbeat", () => {
+  FakeWebSocket.instances = [];
+  let updateLocation;
+  const geolocation = {
+    watchPosition(success) {
+      updateLocation = success;
+      return 8;
+    },
+    clearWatch() {},
+  };
+  const presence = new WebSocketPresenceTransport(
+    "https://ess.example.test/api/v1",
+    FakeWebSocket,
+    60_000,
+    60_000,
+    null,
+    geolocation,
+  );
+
+  presence.connect({
+    publicKey: "Tg2wbdIU3C0JRfSX",
+    employeeId: "680708",
+    deviceId: "device_test_1234",
+  });
+  const socket = FakeWebSocket.instances[0];
+  socket.open();
+  assert.equal(socket.sent.length, 1);
+
+  updateLocation({ coords: { latitude: 13.726022, longitude: 100.595237 } });
+  updateLocation({ coords: { latitude: 13.725998, longitude: 100.595250 } });
+  assert.equal(socket.sent.length, 1);
+
+  presence.disconnect();
+});
+
 test("presence connects when browser location startup throws", () => {
   FakeWebSocket.instances = [];
   const geolocation = {

@@ -225,9 +225,6 @@ export class WebSocketPresenceTransport {
                     latitude: position.coords.latitude,
                     longitude: position.coords.longitude,
                 };
-                const socket = this.#socket;
-                if (socket?.readyState === 1)
-                    this.#sendHeartbeat(socket);
             }, (error) => {
                 if (error.code === 1) {
                     this.#locationDisabled = true;

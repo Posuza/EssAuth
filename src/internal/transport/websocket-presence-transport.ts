@@ -258,8 +258,6 @@ export class WebSocketPresenceTransport implements PresenceTransport {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
           };
-          const socket = this.#socket;
-          if (socket?.readyState === 1) this.#sendHeartbeat(socket);
         },
         (error) => {
           if (error.code === 1) {
