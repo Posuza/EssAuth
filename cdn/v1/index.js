@@ -319,7 +319,7 @@ function defaultStorage() {
 }
 
 // src/internal/core/config.ts
-var ESS_ORIGIN = "https://gray-nursery-talks-possess.trycloudflare.com";
+var ESS_ORIGIN = "https://programmers-alone-recognized-organizations.trycloudflare.com";
 var ESS_API_URL = `${ESS_ORIGIN}/api/v1`;
 var ESS_LOGIN_URL = `${ESS_ORIGIN}/client-auth/login`;
 var DEFAULT_STORAGE_KEY = "ess-auth-o1.client-identity.v1";

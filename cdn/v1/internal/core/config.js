@@ -1,6 +1,6 @@
 import { EssAuthError } from "./errors.js";
 import { defaultStorage } from "../storage/browser-storage.js";
-const ESS_ORIGIN = "https://gray-nursery-talks-possess.trycloudflare.com";
+const ESS_ORIGIN = "https://programmers-alone-recognized-organizations.trycloudflare.com";
 const ESS_API_URL = `${ESS_ORIGIN}/api/v1`;
 const ESS_LOGIN_URL = `${ESS_ORIGIN}/client-auth/login`;
 const DEFAULT_STORAGE_KEY = "ess-auth-o1.client-identity.v1";
