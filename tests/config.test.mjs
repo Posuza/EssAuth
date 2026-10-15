@@ -15,10 +15,10 @@ test("SDK owns the fixed ESS API and hosted login endpoints", () => {
 
   assert.equal(
     config.apiUrl,
-    "https://programmers-alone-recognized-organizations.trycloudflare.com/api/v1",
+    "https://ess-faceregister.esscentor.com/api/v1",
   );
   assert.equal(
     config.loginUrl,
-    "https://programmers-alone-recognized-organizations.trycloudflare.com/client-auth/login",
+    "https://ess-faceregister.esscentor.com/client-auth/login",
   );
 });
