@@ -2,7 +2,7 @@ import { EssAuthError } from "./errors.js";
 import { defaultStorage } from "../storage/browser-storage.js";
 import type { EssAuthInitOptions, StorageLike } from "../../public/types.js";
 
-const ESS_ORIGIN = "https://menus-missions-huge-flex.trycloudflare.com";
+const ESS_ORIGIN = "https://refine-treatments-polo-par.trycloudflare.com";
 const ESS_API_URL = `${ESS_ORIGIN}/api/v1`;
 const ESS_LOGIN_URL = `${ESS_ORIGIN}/client-auth/login`;
 const DEFAULT_STORAGE_KEY = "ess-auth-o1.client-identity.v1";
