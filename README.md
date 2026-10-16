@@ -16,25 +16,22 @@ Choose the integration that matches the client application:
 - [Plain HTML integration](./docs/PLAIN_HTML.md)
 - [React and Vite integration](./docs/REACT_VITE.md)
 
-For an automatic CDN channel, client applications load the latest compatible
-semantic v1 release with a five-minute URL bucket:
+Client applications load the SDK from the ESS deployment:
 
 ```js
-const bucket = Math.floor(Date.now() / 300_000);
-const sdkUrl =
-  `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@release-v1/cdn/v1/index.js?v=${bucket}`;
-const { default: EssAuth } = await import(sdkUrl);
+const SDK_URL = "https://ess-faceregister.esscentor.com/sdk/v1/index.js";
+const { default: EssAuth } = await import(SDK_URL);
 ```
 
-This one-time client loader allows compatible `v1.x.x` SDK updates without
-changing or restarting the client application server. Publish each update as a
-new semantic version tag; never replace an existing tag. An already-open page
-must reload before it can execute newly published JavaScript.
+This fixed URL serves the SDK version currently deployed by ESS. Client source
+code does not change when ESS updates the SDK. An already-open page must reload
+before it can execute newly deployed JavaScript.
 
 ## Use
 
 ```js
-import EssAuth from "@ess/auth-o1";
+const SDK_URL = "https://ess-faceregister.esscentor.com/sdk/v1/index.js";
+const { default: EssAuth } = await import(SDK_URL);
 
 const auth = await EssAuth.init({
   publicKey: "Ab3dE6gH9jKm2NpQ",

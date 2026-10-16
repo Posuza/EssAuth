@@ -22,10 +22,9 @@ module script:
     <button id="logout" type="button" hidden>Sign out</button>
 
     <script type="module">
-      const bucket = Math.floor(Date.now() / 300_000);
-      const sdkUrl =
-        `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@release-v1/cdn/v1/index.js?v=${bucket}`;
-      const { default: EssAuth } = await import(sdkUrl);
+      const SDK_URL =
+        "https://ess-faceregister.esscentor.com/sdk/v1/index.js";
+      const { default: EssAuth } = await import(SDK_URL);
 
       const status = document.querySelector("#auth-status");
       const loginButton = document.querySelector("#login");
@@ -77,4 +76,4 @@ HTML application does not read or store the ticket itself.
 On later reloads, the SDK restores the stored employee identity without
 requiring ESS. A new login still requires ESS.
 
-See [Installation](./INSTALLATION.md) for pinned CDN and package alternatives.
+See [Installation](./INSTALLATION.md) for the hosted SDK setup.

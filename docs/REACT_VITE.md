@@ -19,11 +19,9 @@ identifier, not a secret.
 Create `src/services/ess-auth.ts`:
 
 ```ts
-const bucket = Math.floor(Date.now() / 300_000);
-const SDK_URL =
-  `https://cdn.jsdelivr.net/gh/Posuza/EssAuth@release-v1/cdn/v1/index.js?v=${bucket}`;
+const SDK_URL = "https://ess-faceregister.esscentor.com/sdk/v1/index.js";
 
-type EssAuthClient = {
+export type EssAuthClient = {
   employeeId: string | null;
   error: Error | null;
   login(): void;
@@ -35,8 +33,11 @@ let authPromise: Promise<EssAuthClient> | undefined;
 export function getEssAuth(): Promise<EssAuthClient> {
   authPromise ??= import(/* @vite-ignore */ SDK_URL).then(
     ({ default: EssAuth }) =>
-      EssAuth.init({ publicKey: import.meta.env.VITE_ESS_PUBLIC_KEY }),
+      EssAuth.init({
+        publicKey: import.meta.env.VITE_ESS_PUBLIC_KEY,
+      }),
   );
+
   return authPromise;
 }
 
@@ -138,8 +139,9 @@ from the error state.
 
 ## SDK updates
 
-The five-minute bucket lets a page reload discover compatible updates from the
-latest v1 tag without changing client code or restarting Vite. It does not
-replace JavaScript inside a page that is already open.
+The fixed URL serves the SDK version currently deployed by ESS. Client
+applications do not need to change their source code when ESS deploys an SDK
+update. A page that is already open continues running its loaded SDK until the
+user reloads it.
 
-See [Installation](./INSTALLATION.md) for pinned CDN and package alternatives.
+See [Installation](./INSTALLATION.md) for the hosted SDK setup.
