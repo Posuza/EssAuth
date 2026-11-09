@@ -92,7 +92,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
   assert.equal(auth.error, null);
   assert.deepEqual(requests, [
     {
-      url: "https://ess-faceregister.esscentor.com/api/v1/client-auth/callback/validate",
+      url: "http://localhost:9091/api/v1/client-auth/callback/validate",
       body: {
         public_key: "Ab3dE6gH9jKm2NpQ",
         return_to: "https://client.example.test/payroll?view=summary&ticket=opaque-ticket#totals",
@@ -100,7 +100,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
       keepalive: false,
     },
     {
-      url: "https://ess-faceregister.esscentor.com/api/v1/client-auth/tickets/verify",
+      url: "http://localhost:9091/api/v1/client-auth/tickets/verify",
       body: {
         public_key: "Ab3dE6gH9jKm2NpQ",
         ticket: "opaque-ticket",
@@ -118,7 +118,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
   assert.equal(restored.employeeId, null);
   assert.equal(storage.values.size, 0);
   assert.deepEqual(requests[2], {
-    url: "https://ess-faceregister.esscentor.com/api/v1/client-auth/logout",
+    url: "http://localhost:9091/api/v1/client-auth/logout",
     body: {
       public_key: "Ab3dE6gH9jKm2NpQ",
       employee_id: "680708",
@@ -134,7 +134,7 @@ test("redirect login verifies, restores, and logs out the client identity", asyn
   const redirect = new URL(assignedUrl);
   assert.equal(
     redirect.href.startsWith(
-      "https://ess-faceregister.esscentor.com/client-auth/login?",
+      "http://localhost:9091/client-auth/login?",
     ),
     true,
   );

@@ -318,8 +318,10 @@ function defaultStorage() {
   return session ?? local ?? new MemoryStorage();
 }
 
-// src/internal/core/config.ts
+// src/internal/core/sdk-origin.ts
 var ESS_ORIGIN = "https://ess-faceregister.esscentor.com";
+
+// src/internal/core/config.ts
 var ESS_API_URL = `${ESS_ORIGIN}/api/v1`;
 var ESS_LOGIN_URL = `${ESS_ORIGIN}/client-auth/login`;
 var DEFAULT_STORAGE_KEY = "ess-auth-o1.client-identity.v1";

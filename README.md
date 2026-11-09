@@ -31,6 +31,15 @@ changing or restarting the client application server. Publish each update as a
 new semantic version tag; never replace an existing tag. An already-open page
 must reload before it can execute newly published JavaScript.
 
+## Build-time ESS origin
+
+The SDK reads `ESS_ORIGIN` from `.env` before building. Copy `.env.example` to
+`.env` for a local build and set the public ESS origin. `.env` takes precedence
+over the build process environment. Run `npm run publish:cdn` after changing it;
+the generated JavaScript embeds that origin. The ESS deployment script writes
+`.env` from `FrontendPublicUrl` before installing dependencies, building the
+SDK, and starting the service.
+
 ## Use
 
 ```js
