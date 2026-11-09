@@ -27,6 +27,20 @@ This fixed URL serves the SDK version currently deployed by ESS. Client source
 code does not change when ESS updates the SDK. An already-open page must reload
 before it can execute newly deployed JavaScript.
 
+## Build-time ESS origin
+
+The SDK reads `ESS_ORIGIN` from `.env` when it builds. Copy `.env.example` to
+`.env` and set it to the public origin of the ESS face registration site, such
+as `https://your-ess-host.example`. The value must contain only the scheme,
+host, and optional port. `.env` takes precedence over `ESS_ORIGIN` in the build
+process environment.
+
+Run `npm run publish:cdn` after changing it. The origin is embedded in the
+generated JavaScript, so changing `.env` alone does not change a deployed SDK.
+The ESS deployment script writes this `.env` value from `FrontendPublicUrl`
+before building the SDK. Client callback URLs still come from the client's
+current browser location.
+
 ## Use
 
 ```js

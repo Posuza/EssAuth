@@ -1,3 +1,5 @@
 node_modules/
+.env
+src/internal/core/sdk-origin.ts
 test/
 *.tgz

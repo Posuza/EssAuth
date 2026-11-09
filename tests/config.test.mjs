@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { resolveConfig } from "../dist/internal/core/config.js";
 
-test("SDK owns the fixed ESS API and hosted login endpoints", () => {
+test("SDK uses the build-time ESS origin for API and login endpoints", () => {
   const config = resolveConfig({
     publicKey: "Ab3dE6gH9jKm2NpQ",
     storage: {
@@ -15,10 +15,10 @@ test("SDK owns the fixed ESS API and hosted login endpoints", () => {
 
   assert.equal(
     config.apiUrl,
-    "https://ess-faceregister.esscentor.com/api/v1",
+    "http://localhost:9091/api/v1",
   );
   assert.equal(
     config.loginUrl,
-    "https://ess-faceregister.esscentor.com/client-auth/login",
+    "http://localhost:9091/client-auth/login",
   );
 });
